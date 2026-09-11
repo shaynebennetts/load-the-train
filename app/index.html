@@ -204,10 +204,6 @@
   .card p { margin: .45rem 0; line-height: 1.5; }
   .card ul { margin: .4rem 0; padding-left: 1.1rem; }
   .card li { margin: .25rem 0; }
-  .card .draft { border-left: 3px solid var(--barn); padding-left: .7rem;
-                 background: #2E211899; }
-  .card .draftlab { color: #FF8A7A; font-size: .72rem; font-weight: 700;
-                    letter-spacing: .08em; text-transform: uppercase; }
   .card .keys { font-size: .85rem; color: #C9B79E; }
   .cardbtns { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .9rem; }
   .dots { display: flex; gap: 5px; margin-top: .8rem; }
@@ -346,7 +342,14 @@ const PARAMS = Object.freeze({
                            //     and needs 237. See SPEC 4.1.
 
   // --- rules (SPEC §5.6) --------------------------------------------------
-  fill_target: 0.95,       // Every car must reach >= 95 % of capacity.
+  fill_target: 0.90,       // Every car must reach >= 90 % of capacity.
+                           //     DEPARTS FROM THE BRIEF, which sets 95 %
+                           //     ("keep every car above 95 % full"). Lowered on
+                           //     Shayne's instruction and disclosed to the
+                           //     player in the intro. See SPEC 3.2 and
+                           //     SPEC 9 item 7. Nothing else reads a literal
+                           //     0.95 — the gate, the strip threshold line and
+                           //     the car-side line all derive from this.
   loss_budget: 0.01,       // Total loss must stay < 1 % of grain RELEASED
                            //     (decision 14 — the same two quantities that
                            //     Test 1's mass ledger closes on).
@@ -844,7 +847,7 @@ const ledger = (() => {
 // ===========================================================================
 const rules = (() => {
 
-  // Gate 1: every car at or above 95 % of capacity.
+  // Gate 1: every car at or above fill_target (90 %) of capacity.
   // Gate 2: grain on the ground below 1 % of grain RELEASED — the same two
   //         quantities Test 1's mass ledger closes on (SPEC decision 14).
   function verdict(st, L) {
@@ -1823,7 +1826,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
                      bw - m(0.56), gh + m(0.3));
         ctx.restore();
       }
-      // 95 % line on the car itself
+      // fill_target line on the car itself
       const ty = top + m(0.22) + (bh - m(0.22)) * (1 - P.fill_target);
       ctx.strokeStyle = '#F6EFE3'; ctx.lineWidth = 1.6;
       ctx.setLineDash([m(0.35), m(0.28)]);
@@ -2287,18 +2290,22 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     if (S.mode === 'report') return showReport();
   }
 
-  // ---- intro (SPEC §5.8). PHYSICS WORDING IS A DRAFT FOR SHAYNE ----------
+  // ---- intro (SPEC §5.8) ------------------------------------------------
+  // The physics wording was a draft for Shayne to replace; he accepted it as
+  // written on 2026-09-11, so the draft marking and its styling are gone.
+  // It still has to satisfy the SPEC §5.8 constraints, which are unchanged:
+  // no "rocket equation", the coasting caveat never dropped, and the two
+  // disclosed departures (flow rate, rated power) stated to the player.
   const INTRO = [
     { h: 'Load the train',
-      draft: false,
       html:
-        '<p>Twenty grain hopper cars and a locomotive, one kilometre short of a ' +
+        '<p>Twenty grain hopper cars and a locomotive, thirty metres short of a ' +
         'loading chute. Fill every car, quickly, without throwing grain on the ground.</p>' +
         '<h3>To pass</h3><ul>' +
-        '<li>Every one of the 20 cars at <b>95 % or more</b>.</li>' +
+        '<li>Every one of the 20 cars at <b>90 % or more</b>.</li>' +
         '<li>Total grain loss under <b>1 %</b> of what the chute released.</li>' +
         '<li>Ranked by elapsed time. Both thresholds are pass-or-fail.</li></ul>' },
-    { h: 'The physics — idealisations', draft: true,
+    { h: 'The physics — idealisations',
       html:
         '<p><b>Zero rolling resistance and zero aerodynamic drag.</b> This is a ' +
         'deliberate idealisation, and it has a consequence you will feel ' +
@@ -2313,8 +2320,11 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'takes 144 s to fill one car, which would mean creeping at 0.1 m/s and ' +
         'feeling nothing; at this rate the grain fights you hard enough to ' +
         'matter. At full power with the chute open the grain holds the train to ' +
-        'about <b>4.2 m/s</b> — the locomotive cannot outrun it.</p>' },
-    { h: 'The physics — loading costs you speed', draft: true,
+        'about <b>6.2 m/s</b> — but a car only reaches the 90 % mark in a ' +
+        'single pass below <b>4.8 m/s</b> (and fills to the brim below ' +
+        '<b>4.3 m/s</b>), so the locomotive <i>can</i> outrun the chute. ' +
+        'Holding full power all the way down the train will not load it.</p>' },
+    { h: 'The physics — loading costs you speed',
       html:
         '<p>Grain leaves the chute with <b>no forward speed</b>. When it lands in ' +
         'a moving car it has to be dragged up to the speed of the train, and the ' +
@@ -2328,9 +2338,9 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'the train and it is not.</p>' +
         '<p>Because retardation is regenerative and the motors are ' +
         'power-limited, the force you can brake with falls off as <code>1/v</code>. ' +
-        'A loaded train needs about 30 m to stop from 1 m/s. Creeping is not ' +
-        'optional.</p>' },
-    { h: 'Controls', draft: false,
+        'A loaded train needs about 80 m — nearly five car lengths — to stop ' +
+        'from 4.3 m/s, and still 3 m from 1 m/s. Creeping is not optional.</p>' },
+    { h: 'Controls',
       html:
         '<p>The chute is fixed. You move the train under it. You start 30 m ' +
         'short of it, so this is all low-speed shunting — small notches.</p>' +
@@ -2354,11 +2364,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
   function showIntro() {
     modal(c => {
       const pg = INTRO[S.introPage];
-      c.innerHTML = '<h2>' + pg.h + '</h2>' +
-        (pg.draft
-          ? '<div class="draft"><div class="draftlab">draft — Shayne to replace ' +
-            'this wording</div>' + pg.html + '</div>'
-          : pg.html);
+      c.innerHTML = '<h2>' + pg.h + '</h2>' + pg.html;
       const dots = document.createElement('div'); dots.className = 'dots';
       INTRO.forEach((_, i) => { const d = document.createElement('div');
         d.className = 'dot' + (i === S.introPage ? ' on' : ''); dots.appendChild(d); });
@@ -2423,7 +2429,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         '<p class="big ' + (V.pass ? 'pass' : 'fail') + '">' +
           (V.pass ? 'PASS' : 'FAIL') + '</p>' +
         '<table class="rpt">' +
-        '<tr><td>every car ≥ 95 %</td><td class="' + (V.fillPass ? 'pass' : 'fail') + '">' +
+        '<tr><td>every car ≥ 90 %</td><td class="' + (V.fillPass ? 'pass' : 'fail') + '">' +
           (V.fillPass ? 'PASS' : 'FAIL') + ' — lowest is car ' + V.minCar + ' at ' +
           (100 * V.minFrac).toFixed(1) + ' %</td></tr>' +
         '<tr><td>loss &lt; 1 % of released</td><td class="' + (V.lossPass ? 'pass' : 'fail') + '">' +
@@ -2432,7 +2438,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         (V.pass ? '<tr><td>grade</td><td>' + rules.grade(S.tWall) + '</td></tr>' : '') +
         '</table>' +
         (V.under.length
-          ? '<p class="fail">Cars under 95 %: ' + V.under.join(', ') + '</p>' : '') +
+          ? '<p class="fail">Cars under 90 %: ' + V.under.join(', ') + '</p>' : '') +
         (V.pass && S.newBest ? '<p class="pass">New personal best.</p>' : '') +
         '<h3>Mass ledger — Test 1</h3><table class="rpt">' +
         '<tr><td>released by the chute</td><td>' + t(L.m_released) + '</td></tr>' +

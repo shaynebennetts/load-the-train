@@ -17,7 +17,7 @@ bearing for everything below.
 |---|---|---|
 | 1 | Timescale (§3.8 of brief) | Fully realistic parameters, **explicit time compression factor C = 25**. 1 s wall clock = 25 s simulated. |
 | 2 | Camera / overview (§5) | Close play view locked near the chute, **plus a persistent fill strip** showing all 20 cars. |
-| 3 | Scoring (§5) | **Hard gate then time.** Every car ≥ 95 % AND loss < 1 % is pass/fail; passing runs ranked by elapsed time. |
+| 3 | Scoring (§5) | **Hard gate then time.** Every car ≥ fill_target AND loss < 1 % is pass/fail; passing runs ranked by elapsed time. The target was the brief's 95 % until 2026-09-11 and is now **90 %** — see §9 item 7. |
 | 4 | Run structure | **Free shunting**, forward and reverse throughout; run ends when the player presses DONE. |
 | 5 | Grain flight | **Instantaneous landing.** Grain accretes at the release instant, at the chute's x. The falling column is cosmetic. Mass ledger stays at three buckets. |
 | 6 | Car opening | **Full-length open trough**, 15.5 m open on a 17.0 m coupler pitch. |
@@ -36,9 +36,9 @@ bearing for everything below.
 
 A locomotive at the head of twenty open-top grain hopper cars starts 1 km short of a fixed
 loading chute. The player drives the train under the chute and opens the chute to load each
-car in turn. The run is a pass only if every car finishes at 95 % of capacity or more and
-total grain loss stays under 1 % of grain released. Passing runs are ranked by elapsed
-time.
+car in turn. The run is a pass only if every car finishes at **90 %** of capacity or more
+(the brief says 95 %; see §9 item 7) and total grain loss stays under 1 % of
+grain released. Passing runs are ranked by elapsed time.
 
 The tension is physical, not scripted. Filling a car takes 144 s of simulated time while
 the car spans only 15.5 m of track, so the train must be nearly stationary to fill. Loading
@@ -314,7 +314,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 |---|---|---|
 | Locomotive mass `m_loco` | **150 t** | Mid of the brief's 120–200 t. A six-axle Co-Co road freight unit. |
 | Driven mass `m_driven` | **150 t** | All six axles driven, so the full loco mass sits on driven axles. Cars are unpowered. |
-| Rated power `P_rated` | **1.0 MW** | Still below the brief's 2–4.5 MW band, but a realistic rating for a large yard shunter. See §3.2. **Deliberately set above the accretion-drag knee** — see §3.2 and decision 6. |
+| Rated power `P_rated` | **1.0 MW** | Still below the brief's 2–4.5 MW band, but a realistic rating for a large yard shunter. See §3.2. **Deliberately set above the accretion-drag knee** — see §3.2 and §9 item 6. |
 | Adhesion coefficient `μ` | **0.30** | Mid of the brief's 0.25–0.35 for dry rail with sanding. Gives `F_adhesion = 441.30 kN`. |
 | Car tare `m_tare` | **28 t** | Mid of the brief's 25–30 t. |
 | Car capacity `m_cap` | **100 t** | Top of the brief's 60–100 t, chosen so the 20 × 100 t = 2000 t figure matches the brief's own timescale arithmetic. |
@@ -328,6 +328,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 | Grain bulk density | **0.77 t/m³** | Wheat. Sets the visual fill height: 100 t → 129.9 m³, against a 15.5 × 3.0 × 2.8 m interior = 130.2 m³. Consistent to 0.3 %. |
 | Approach distance | **30 m** | **Departs from the brief's 1 km. See §3.2.** |
 | Track extent | **−60 m to +700 m** | Chute at `x = 0`, loco nose starts at `x = −30`. Train is 361 m long. Car 20's trough reaches the chute with the nose at `+345.5 m`, and its centre sits under the chute at `+353.25 m` (corrected at task 6 from an earlier estimate of +340 m). ~347 m of spare beyond, ample for free shunting. No buffer stops. |
+| Pass threshold `fill_target` | **90 %** | **Departs from the brief's 95 %. See §3.2 and §9 item 7.** |
 | **Time compression `C`** | **1** — none | The clock is real. See §3.1. |
 
 Derived, for reference:
@@ -342,9 +343,9 @@ Derived, for reference:
 | Launch acceleration, loaded | 0.1628 m/s² |
 | Tractive effort at 1 m/s (full) | 441.3 kN (adhesion-capped; `P/v` would be 1000 kN) |
 | Stopping distance from 1 m/s, tare / loaded | 0.80 m / 3.07 m (adhesion-limited below `v_c`) |
-| Time to fill one car | 3.60 s (3.42 s to 95 %) |
+| Time to fill one car | 3.60 s (3.24 s to the 90 % gate) |
 | Time to fill all twenty | 72.0 s |
-| Max speed to fill a car in one pass | 4.306 m/s |
+| Max speed to fill a car in one pass | 4.306 m/s to the brim, **4.784 m/s to the 90 % gate** |
 | Accretion drag at 1 m/s | 27.8 kN |
 | Loading terminal speed `sqrt(P/ṁ)` | 6.000 m/s — **above** the one-pass limit |
 | Accretion drag at that speed | 166.7 kN (adhesion cap 441.3 kN) |
@@ -366,7 +367,7 @@ as `1/C`**, and with the flow rate raised 40× the windows had become unplayable
 
 | window | at `C = 25` | at `C = 1` |
 |---|---|---|
-| fill one car to 95 % | 137 ms | **3.42 s** |
+| fill one car to the 90 % gate | 130 ms | **3.24 s** |
 | coupling gap passes, at 0.5 m/s | 120 ms | 3.00 s |
 | coupling gap passes, at 1.0 m/s | 60 ms | 1.50 s |
 | car under the chute, at 1.0 m/s | 620 ms | 15.5 s |
@@ -425,8 +426,10 @@ v_eq = sqrt( P_rated / ṁ_flow ) = sqrt( 1 MW / 27 777.8 kg/s ) = 6.000 m/s
 
 which is a genuinely pleasing consequence of the model rather than anything that was put
 in. **At 1 MW that terminal speed sits above the 4.31 m/s one-pass limit**, so the grain no
-longer holds the train inside the fillable band on its own; the player must. See decision 6. This is the brief's §3.8 trade-off taken in the direction it left open: it names
-raising the flow rate as one of the three permitted ways to fix the timescale.
+longer holds the train inside the fillable band on its own; the player must. See §9 item 6.
+
+This is the brief's §3.8 trade-off taken in the direction it left open: it names raising
+the flow rate as one of the three permitted ways to fix the timescale.
 
 **No friction brake** (§2.5) is a third departure, though the brief only constrained how a
 brake must be modelled rather than requiring one. The regenerative model still satisfies
@@ -501,8 +504,9 @@ scale where the grain stream, the coupling gap and the fill level are all plainl
 Ground line at ~80 % height.
 
 **Fill strip.** Persistent, all 20 cars at a glance. Top edge in portrait, right side in
-landscape and on desktop. Per car: a vertical fill bar, the **95 % threshold as a marked
-line**, car number, and a highlight on whichever car is currently under the chute. Coupling
+landscape and on desktop. Per car: a vertical fill bar, the **pass threshold as a marked
+line** (drawn from `fill_target`, never a literal), car number, and a highlight on whichever
+car is currently under the chute. Coupling
 gaps are drawn as gaps, so a chute sitting over a gap is visible in the strip as well as in
 the play view.
 
@@ -591,8 +595,8 @@ Warm storybook cartoon, all procedural Canvas 2D, no image assets.
 | Soil, spill piles | `#8A6F52` |
 
 Rounded chunky forms, one soft gradient per fill, thick outlines throughout — outlines are
-what keep the coupling gaps and the 95 % line readable when a car is only a few dozen pixels
-wide.
+what keep the coupling gaps and the threshold line readable when a car is only a few dozen
+pixels wide.
 
 Spilled grain accumulates in a heightfield of 2 m bins along the track and is drawn as
 mounds, so the player can see where they wasted it.
@@ -603,19 +607,29 @@ Cosmetic grain particles are drawn from a fixed-size pool, capped at 400.
 ### 5.8 Intro popups
 
 A short skippable sequence at first start, re-openable from the title screen and from pause.
-Four cards. **The physics wording is a draft for Shayne to replace, and is marked as such in
-the file with a clearly delimited `<!-- DRAFT COPY — REPLACE -->` block.**
+Four cards. **The physics wording was a draft for Shayne to replace; he accepted it as
+written on 2026-09-11.** The draft marking, its red bar and the `.draft` / `.draftlab`
+styling are gone, and `INTRO` entries no longer carry a `draft` flag.
 
-The draft must state, and will be checked against these constraints:
+The wording states, and is still checked against, these constraints:
 
 - Zero rolling resistance and zero drag is an idealisation, **and the train therefore never
   slows on its own — every stop must be braked.**
-- Time is compressed by a factor of 25; all other quantities are real.
+- Time is **not** compressed (`C = 1`, §3.1); all other quantities are real except the two
+  disclosed departures below.
 - Grain arrives with no forward speed, so loading pushes back on the train, harder the
   faster you go. **Not called the rocket equation.**
 - Momentum is conserved **only while coasting** — the caveat is never dropped.
-- The rules: ≥ 95 % every car, < 1 % loss, as fast as possible.
+- The rules: ≥ 90 % every car, < 1 % loss, as fast as possible.
 - The controls.
+- The two disclosed parameter departures — flow rate and rated power (§3.2) — and, since
+  2026-09-11, the 90 % pass threshold (§9 item 7).
+
+One number in the accepted text was corrected on acceptance rather than left as written: it
+read "a loaded train needs about 30 m to stop from 1 m/s", which was a 30 kW-era figure. At
+1 MW the measured distances are 3.1 m from 1 m/s and 77 m from 4.3 m/s loaded, so the text
+now quotes the loading-speed figure. The claim it supports — "creeping is not optional" — is
+if anything stronger: 77 m is four and a half car pitches.
 
 ---
 
@@ -835,7 +849,8 @@ Flagged rather than decided, for Shayne's call:
 4. **Power is below the brief's band and the approach is 30 m, not 1 km** (§3.2). Both
    are deliberate playability calls made on play feedback, and both are departures from the
    brief's own text rather than from something it left open.
-5. **Physics wording in the intro is a draft** for you to replace (§5.8), marked in the file.
+5. ~~**Physics wording in the intro is a draft**~~ — **closed 2026-09-11**, accepted as
+   written (§5.8). One stale stopping distance was corrected on acceptance; see §5.8.
 6. **Rated power raised to 1 MW** (30 kW → 500 kW → 1 MW), on Shayne's instruction. This
    **crosses the accretion-drag knee deliberately**: `v_eq = sqrt(P/ṁ) = 6.000 m/s` against
    a one-pass fill limit of 4.306 m/s, so full throttle now outruns the chute and the grain
@@ -853,3 +868,24 @@ Flagged rather than decided, for Shayne's call:
    the car bodies — 91.18 % duty — so the effective flow is `0.9118·ṁ` and
    `v_eq/sqrt(0.9118) = 6.28 m/s`, which is what is measured.
    **This invalidates the grade bands (open point 1) more than `C = 1` already did.**
+7. **Pass threshold lowered 95 % → 90 %** (2026-09-11), on Shayne's instruction. **This is a
+   departure from the brief**, which states the objective as "keep every car above 95 % full"
+   and marks the 95 % threshold on the fill strip. It is disclosed to the player in the intro
+   and in the end-of-run report, both of which now read 90 %.
+
+   What it buys, measured against the shipped code by holding a constant speed past the whole
+   train with the chute open (an ideal driver — the physics, not the input layer):
+
+   | held speed | median car fill |
+   |---|---|
+   | 4.30 m/s | 100.0 % |
+   | 4.50 m/s | 95.7 % |
+   | **4.78 m/s** | **90.1 %** |
+   | 5.00 m/s | 86.1 % |
+
+   So the fastest single pass that still passes goes from **4.53 m/s to 4.78 m/s**, 5.6 %
+   quicker. It does *not* make full throttle viable: at 1 MW that settles at 6.24 m/s and
+   loads 69.7 %, well under either gate. The game still requires throttle modulation.
+
+   The clean algebraic statement is `v_max = L_body / (fill_target · m_cap / ṁ)`, which the
+   measurement above confirms to three figures.

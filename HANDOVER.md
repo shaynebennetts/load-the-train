@@ -40,6 +40,7 @@ order. Each is committed separately with its measurements in the commit message.
 | approach | 1000 m | 30 m | 1 km was a minute of holding full power |
 | friction brake | `k_b·M·g` | **removed** | retardation is regenerative |
 | controls | throttle + brake + reverser | **one signed throttle** | follows from the above |
+| pass threshold | 95 % per car | **90 %** | Shayne's call; **departs from the brief**, disclosed in the intro |
 
 **The traction bug is worth understanding**, because it was the cause of "control fidelity is
 way too coarse". With the throttle scaling only the power term, the `min()` always selected
@@ -79,7 +80,7 @@ g 9.80665     m_loco 150 t    m_driven 150 t   P_rated 1 MW     mu 0.30
 N_cars 20     m_tare 28 t     m_cap 100 t      L_body 15.5 m    L_pitch 17.0 m
 mdot 27 777.8 kg/s (100 000 t/h)               w_chute 0.8 m    L_loco 21 m
 x_start -30   x_min -60       x_max 700        C_time 1         h_step 1/240 s
-fill_target 0.95              loss_budget 0.01                  test_tol 0.001
+fill_target 0.90              loss_budget 0.01                  test_tol 0.001
 ```
 
 Derived: `M_tare` 710 t, `M_full` 2710 t, `F_adhesion` 441.30 kN, `v_cross` 2.266 m/s,
@@ -105,6 +106,20 @@ The settled speed is a little above `v_eq` because grain is captured only over t
 
 **If you retune `P_rated` or `mdot` again, recompute both numbers and say which side of the
 knee you are on.** It changes what the game is about.
+
+### The speed the gate actually sets
+
+The 4.306 m/s above is the speed at which a car fills to the *brim* in one pass. What the
+player is scored against is `fill_target`, so the speed that matters is
+
+```
+v_max = L_body / (fill_target * m_cap / mdot)    = 4.784 m/s at 90 %   (4.532 at 95 %)
+```
+
+Measured against the shipped code by holding a constant speed past the whole train with the
+chute open: 4.30 -> 100.0 %, 4.50 -> 95.7 %, **4.78 -> 90.1 %**, 5.00 -> 86.1 % (median car).
+So lowering the gate to 90 % bought 5.6 % more speed on a single pass. It did **not** make
+full throttle viable — that settles at 6.24 m/s and loads 69.7 %.
 
 ---
 
@@ -169,8 +184,12 @@ broke the moment the flow rate rose 40×. Zero-expectation rows now **require** 
    at 1 m/s, or 69.4 s at full throttle at 1 MW — but a full-throttle pass leaves the train
    only 69.7 % loaded, so a real run needs more than one pass or a slower one. Nobody has
    played a complete 20-car run end to end. A full run may be too long.
-3. **Intro physics wording is a DRAFT** for Shayne to replace. It is marked in the file with
-   a red bar and `.draft` / `draftlab` styling. Do not polish it as if it were final.
+3. ~~**Intro physics wording is a DRAFT**~~ — **closed 2026-09-11.** Shayne accepted it as
+   written. The red bar, the `.draft` / `.draftlab` CSS and the per-card `draft` flag are all
+   removed. One stale number was corrected on acceptance: the stopping distance read "about
+   30 m from 1 m/s", a 30 kW-era figure; measured at 1 MW it is 3.1 m from 1 m/s and 77 m
+   from 4.3 m/s loaded, and the text now quotes the loading-speed figure. `SPEC.md` §5.8
+   records this.
 4. **Departures from the brief's own text** are in `SPEC.md` §3.2: 1 MW vs its 2–4.5 MW
    band, 30 m vs its 1 km, 100 000 t/h vs its 1500–3000 t/h. All disclosed to the player in
    the intro. The brief's §3.8 explicitly permits raising the flow rate as one of three ways
@@ -216,7 +235,7 @@ Things that look like bugs but are not:
    comfortable, but it is unverified on hardware.
 4. Cross-browser and GitHub Pages check (task 25), including confirming zero network requests
    in devtools.
-5. Ask Shayne to replace the draft physics wording.
+5. ~~Ask Shayne to replace the draft physics wording.~~ Done — accepted as written.
 6. Only then consider pushing. **Do not push without asking** — nothing has been published yet.
 
 ---
