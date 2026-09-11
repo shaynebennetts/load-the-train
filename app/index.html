@@ -877,18 +877,39 @@ const rules = (() => {
     return 'D';
   }
 
-  // Distance needed to stop from speed v at full brake. Used for the trip stop
-  // that keeps the train on the track without inventing a crash state: the
-  // brake is applied through the normal control path, so the energy it removes
-  // lands in W_regen like any other retardation and the ledger still closes.
-  // Distance to stop from speed v at full regenerative effort. Kinetic energy
-  // is removed at constant power P, so v^2 falls linearly and
-  //   s = integral v dt = M |v|^3 / (3 P).
-  // Below v_cross adhesion gives MORE force than P/|v|, so this overestimates
-  // and is safe to trip on. It is strongly mass dependent, unlike the friction
-  // brake it replaced: 30 m from 1 m/s at 2710 t, against 7.9 m at 710 t.
+  // Distance needed to stop from speed v at full regenerative effort. Used for
+  // the trip stop that keeps the train on the track without inventing a crash
+  // state: the brake is applied through the normal control path, so the energy
+  // it removes lands in W_regen like any other retardation and the ledger still
+  // closes.
+  //
+  // PIECEWISE, and it has to be. Retardation is traction() with a negative
+  // argument, so it is capped by ADHESION below v_c and by POWER above it:
+  //
+  //   v <= v_c   constant force F_a       s = M v^2 / (2 F_a)
+  //   v >  v_c   constant power to v_c,   s = M (v^3 - v_c^3) / (3 P)
+  //              then adhesion to rest      + M v_c^2 / (2 F_a)
+  //
+  // This was wrong until 2026-09-12: it used the constant-power form
+  // M|v|^3/(3P) at every speed, with a comment claiming that adhesion gives
+  // MORE force than P/|v| below v_c so the estimate was conservative. It is the
+  // other way round -- min() selects the adhesion cap there, which is LESS
+  // force, so the train takes LONGER to stop and the old form UNDER-estimated.
+  // The error is bounded by M v_c^2 / (6 F_a) = 5.26 m loaded, 1.38 m tare, and
+  // the call site adds a flat 6 m margin, so the trip stop never actually
+  // failed -- but it was safe by luck, and the raise to 1 MW had doubled the
+  // error. Measured against the integrator, the piecewise form agrees to 0.01 m
+  // at 1, 2, 4 and 6 m/s at both tare and loaded mass.
+  //
+  // Strongly mass dependent, unlike the friction brake it replaced:
+  // 3.07 m from 1 m/s at 2710 t, against 0.80 m at 710 t.
   function stopDistance(par, v, M) {
-    return M * Math.abs(v) ** 3 / (3 * par.P_rated);
+    const F_a = par.mu * par.m_driven * par.g;
+    const v_c = par.P_rated / F_a;
+    const a = Math.abs(v);
+    const tail = M * v_c * v_c / (2 * F_a);          // v_c -> 0, adhesion-limited
+    return a <= v_c ? M * a * a / (2 * F_a)
+                    : M * (a ** 3 - v_c ** 3) / (3 * par.P_rated) + tail;
   }
 
   return { verdict, grade, stopDistance, BANDS };

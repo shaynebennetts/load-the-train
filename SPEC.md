@@ -160,24 +160,38 @@ This still meets the brief's two requirements on braking. It is a **force**, not
 power; and it is **adhesion-limited**, capped at 441.30 kN, so it does not diverge as
 `v → 0` the way a naive constant-power brake would. The `min()` is what guarantees that.
 
-**The consequence the player feels.** Retarding effort falls off as `1/v`, and kinetic
-energy is removed at constant power, so `v²` falls linearly and the stopping distance is
+**The consequence the player feels.** The stopping distance is **piecewise**, because the
+same `min()` that caps tractive effort caps retarding effort: adhesion binds below `v_c`,
+constant power above it.
 
 ```
-s_stop = M · |v|³ / (3 · P_rated)
+v ≤ v_c :  s_stop = M·v² / (2·F_a)
+v > v_c :  s_stop = M·(v³ − v_c³) / (3·P_rated)  +  M·v_c² / (2·F_a)
 ```
 
-strongly mass dependent, unlike the friction brake it replaced:
+**This document previously gave only the constant-power branch**, `M·|v|³/(3·P_rated)`, at
+every speed, and `rules.stopDistance()` implemented it that way with a comment claiming it
+was conservative. It is not: below `v_c` the `min()` selects the adhesion cap, which is
+*less* force than `P/|v|`, so the train takes *longer* to stop and the constant-power form
+under-estimates — by up to `M·v_c²/(6·F_a)` = 5.26 m loaded, 1.38 m tare. The trip stop's
+flat 6 m margin covered it, so nothing ever failed, but it was safe by accident and the
+raise to 1 MW had doubled the error. Corrected 2026-09-12; the piecewise form agrees with
+the integrator to 0.01 m at every speed and mass below.
+
+Still strongly mass dependent, unlike the friction brake it replaced — **measured**, by
+driving the shipped integrator at full reverse effort until `v` reaches zero:
 
 | speed | empty, 710 t | loaded, 2710 t |
 |---|---|---|
-| 0.5 m/s | 1.0 m | 3.8 m |
-| 1.0 m/s | 7.9 m | 30.1 m |
-| 2.0 m/s | 63.1 m | 241.0 m |
+| 0.5 m/s | 0.20 m | 0.77 m |
+| 1.0 m/s | 0.80 m | 3.07 m |
+| 2.0 m/s | 3.22 m | 12.28 m |
+| 4.0 m/s | 16.52 m | 63.07 m |
+| 6.0 m/s | 52.50 m | 200.38 m |
 
-A loaded train needs 30 m to stop from 1 m/s, roughly two car pitches. With no friction
-brake to fall back on, creeping is not optional — which suits a game whose whole action is
-placing a 15.5 m trough under a 0.8 m chute.
+At loading speed — 4.3 m/s — a loaded train needs about 77 m to stop, four and a half car
+pitches. With no friction brake to fall back on, creeping is not optional, which suits a
+game whose whole action is placing a 15.5 m trough under a 0.8 m chute.
 
 Holding reverse effort through `v = 0` correctly drives the train backwards; there is no
 clamp, because reversing is what that control does. Effort is continuous through zero, so
