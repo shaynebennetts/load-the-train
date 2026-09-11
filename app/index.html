@@ -133,11 +133,192 @@ const DERIVED = Object.freeze({
 });
 
 // ===========================================================================
+//  physics — SPEC.md §2.3 and §4.
+//
+//  State is (x, p) with p = M*v, plus the per-car grain. Integrating MOMENTUM
+//  rather than velocity is the whole trick: with u = 0 the variable-mass law is
+//  just dp/dt = F_ext, and the v*dM/dt retarding term then EMERGES when v is
+//  recovered as p/M. It is never written down anywhere below. Expanding the
+//  recovery gives M*dv/dt = F_ext - v*dM/dt identically.
+//
+//  Knows nothing about rendering, input, or the DOM.
+// ===========================================================================
+const physics = (() => {
+
+  // --- state ---------------------------------------------------------------
+  // `over` may override any PARAM, which is how the tests of SPEC §7 set
+  // mu: Infinity, a different P, and so on, without touching the code path.
+  function create(over) {
+    const par = Object.freeze(Object.assign({}, PARAMS, over || {}));
+    return {
+      par,
+      t: 0,                                   // simulated seconds
+      x: par.x_start,                         // m, position of the loco nose
+      p: 0,                                   // kg m/s, = M*v
+      fill: new Float64Array(par.N_cars),     // kg of grain in each car
+      // instrumentation, not physics
+      n_base: 0, n_sub: 0, max_sub_per_base: 0,
+    };
+  }
+
+  // Instantaneous total moving mass: loco + car tare + grain aboard.
+  // SPEC §2.3. Grain on the ground is NOT here — it was never accelerated.
+  function grainAboard(st) {
+    let s = 0;
+    for (let i = 0; i < st.fill.length; i++) s += st.fill[i];
+    return s;
+  }
+  function mass(st) {
+    return st.par.m_loco + st.par.N_cars * st.par.m_tare + grainAboard(st);
+  }
+  function speed(st) { return st.p / mass(st); }
+
+  // --- forces --------------------------------------------------------------
+  // Filled in by tasks 3 and 5. Zero for now, so task 2 tests the integrator
+  // and nothing else.
+  function traction(par, ctl, v) { return 0; }
+  function braking(par, ctl, v, M) { return 0; }
+
+  // --- one substep ---------------------------------------------------------
+  // Classical RK4 on (x, p). M is held at its substep-entry value: within a
+  // substep the mass changes by at most a few kg out of 7e5, and p is advanced
+  // by the external impulse alone, which does not involve M at all. The mass
+  // is then updated by the grain deposition after the mechanical step, which
+  // is where the 0.5*v^2*dm of kinetic energy is actually lost.
+  function rk4(st, ctl, dt) {
+    const M = mass(st);
+    const par = st.par;
+    const f = (x, p) => {
+      const v = p / M;
+      const Ft = traction(par, ctl, v);
+      const Fb = braking(par, ctl, v, M);
+      return { dx: v, dp: Ft + Fb, v, Ft, Fb };
+    };
+    const k1 = f(st.x,                    st.p);
+    const k2 = f(st.x + 0.5 * dt * k1.dx, st.p + 0.5 * dt * k1.dp);
+    const k3 = f(st.x + 0.5 * dt * k2.dx, st.p + 0.5 * dt * k2.dp);
+    const k4 = f(st.x +       dt * k3.dx, st.p +       dt * k3.dp);
+    return {
+      M, dt,
+      dx: dt * (k1.dx + 2 * k2.dx + 2 * k3.dx + k4.dx) / 6,
+      dp: dt * (k1.dp + 2 * k2.dp + 2 * k3.dp + k4.dp) / 6,
+      k: [k1, k2, k3, k4],
+    };
+  }
+
+  // Apply a completed substep.
+  function commit(st, ctl, r) {
+    st.x += r.dx;
+    st.p += r.dp;
+    st.t += r.dt;
+    st.n_sub++;
+  }
+
+  // --- adaptive substepping (SPEC §4.1) ------------------------------------
+  // March across the base step, choosing each substep so the predicted
+  // velocity change stays inside sub_tol * max(|v|, sub_vref). This is what
+  // keeps F = P/v tractable as v -> 0, and it is the integrator used in normal
+  // play, not a path added for the tests.
+  function baseStep(st, ctl, H) {
+    let left = H, guard = 0, subs = 0;
+    while (left > 1e-15 && guard++ < 200000) {
+      const M = mass(st);
+      const v = st.p / M;
+      const par = st.par;
+      const F = Math.abs(traction(par, ctl, v) + braking(par, ctl, v, M));
+      const cap = par.sub_tol * Math.max(Math.abs(v), par.sub_vref) * M;
+      // dt such that |dp| stays under `cap`; unbounded when there is no force.
+      let dt = F > 0 ? cap / F : Infinity;
+      if (!(dt > 1e-13)) dt = 1e-13;          // guarantee forward progress
+      if (dt > left) dt = left;
+      commit(st, ctl, rk4(st, ctl, dt));
+      left -= dt;
+      subs++;
+    }
+    st.n_base++;
+    if (subs > st.max_sub_per_base) st.max_sub_per_base = subs;
+  }
+
+  // Advance exactly `dt` of SIMULATED time, in base steps of h_step.
+  // Driven by an integer step count, and st.t is recomputed from that count at
+  // every base boundary rather than accumulated, so 14400 steps of 1/240 s land
+  // on exactly 60 s with no drift and no stray final step.
+  function advance(st, ctl, dt) {
+    if (!(dt > 0)) return;
+    const h = st.par.h_step, t0 = st.t;
+    const n = Math.floor(dt / h + 1e-9);
+    for (let i = 0; i < n; i++) {
+      baseStep(st, ctl, h);
+      st.t = t0 + (i + 1) * h;
+    }
+    const rem = dt - n * h;
+    if (rem > 1e-15) baseStep(st, ctl, rem);
+    st.t = t0 + dt;
+  }
+
+  return { create, mass, speed, grainAboard, advance, baseStep, rk4 };
+})();
+
+// ===========================================================================
 //  LTT — the console API of SPEC.md §7.5. Grows task by task.
 // ===========================================================================
+const CTL_NEUTRAL = { throttle: 0, brake: 0, dir: 1, chute: false };
+
+let _st = physics.create();
+let _ctl = Object.assign({}, CTL_NEUTRAL);
+
 const LTT = {
   params:  () => PARAMS,
   derived: () => DERIVED,
+
+  reset(over) { _st = physics.create(over); _ctl = Object.assign({}, CTL_NEUTRAL); return LTT; },
+
+  // Set controls and/or kinematic state directly. Tests use this instead of
+  // the input layer, so they are exactly reproducible (SPEC §4.2).
+  setState(s) {
+    s = s || {};
+    for (const k of ['throttle', 'brake', 'dir', 'chute']) {
+      if (k in s) _ctl[k] = s[k];
+    }
+    if ('x' in s) _st.x = s.x;
+    if ('fill' in s) { for (let i = 0; i < _st.fill.length; i++) _st.fill[i] = s.fill[i] || 0; }
+    if ('v' in s) _st.p = s.v * physics.mass(_st);   // after fill, so M is right
+    if ('p' in s) _st.p = s.p;
+    return LTT;
+  },
+
+  step(dt_sim) { physics.advance(_st, _ctl, dt_sim); return LTT; },
+
+  state() {
+    return {
+      t: _st.t, x: _st.x, p: _st.p,
+      v: physics.speed(_st), M: physics.mass(_st),
+      grain_aboard: physics.grainAboard(_st),
+      fill: Array.from(_st.fill),
+      n_base: _st.n_base, n_sub: _st.n_sub, max_sub_per_base: _st.max_sub_per_base,
+    };
+  },
+
+  // One shot: fresh state, set controls, advance t seconds, report.
+  run(o) {
+    o = o || {};
+    const over = {};
+    for (const k of Object.keys(PARAMS)) if (k in o) over[k] = o[k];
+    LTT.reset(over);
+    LTT.setState(o);
+    if ('M' in o) {
+      // Convenience for the hand-checkable tests: pin the total mass by
+      // putting the balance of it into car 1 as pre-loaded grain.
+      const bare = _st.par.m_loco + _st.par.N_cars * _st.par.m_tare;
+      const extra = o.M - bare;
+      if (extra < 0) throw new Error('M below bare train mass ' + bare);
+      _st.fill[0] = extra;
+      if ('v' in o) _st.p = o.v * physics.mass(_st);
+    }
+    if ('v0' in o) _st.p = o.v0 * physics.mass(_st);
+    physics.advance(_st, _ctl, o.t || 0);
+    return LTT.state();
+  },
 };
 
 if (typeof globalThis !== 'undefined') { globalThis.LTT = LTT; }
