@@ -174,9 +174,27 @@ const physics = (() => {
   function speed(st) { return st.p / mass(st); }
 
   // --- forces --------------------------------------------------------------
-  // Filled in by tasks 3 and 5. Zero for now, so task 2 tests the integrator
-  // and nothing else.
-  function traction(par, ctl, v) { return 0; }
+  // Traction, SPEC §2.4:  F = min( P_available / v , mu * m_driven * g )
+  //
+  // The adhesion cap is not optional. P/v diverges as v -> 0, so without it the
+  // train either launches off the line at t = 0 or produces a NaN. With
+  // mu = 0.30 the cap binds below v_cross = 6.798 m/s, which covers every
+  // launch and every low-speed shunt — i.e. all of normal play.
+  //
+  // Setting mu = Infinity (how Test 3 is run, SPEC §7.3) makes the cap
+  // unselectable and leaves F = P/v exactly. The code path is unchanged; only
+  // a parameter takes a limiting value.
+  function traction(par, ctl, v) {
+    if (!(ctl.throttle > 0)) return 0;
+    const adh = par.mu * par.m_driven * par.g;
+    const vd = v * ctl.dir;               // speed in the direction being pulled
+    // Stalled, or still rolling the other way: the power limit does not apply,
+    // the motors are at full effort and adhesion is what holds it back.
+    if (!(vd > 0)) return ctl.dir * adh;
+    return ctl.dir * Math.min(ctl.throttle * par.P_rated / vd, adh);
+  }
+
+  // Filled in by task 5.
   function braking(par, ctl, v, M) { return 0; }
 
   // --- one substep ---------------------------------------------------------
