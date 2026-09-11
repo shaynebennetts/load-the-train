@@ -322,14 +322,19 @@ const PARAMS = Object.freeze({
                            //     No buffer stops, no crash state (decision 11).
 
   // --- time ---------------------------------------------------------------
-  C_time:   25.0,          // Time compression. 1 s wall = 25 s simulated.
-                           //     2000 t at 2500 t/h is 48 min simulated, which
-                           //     is not a game; at C=25 the loading is 115 s of
-                           //     wall clock. Nothing else is compressed.
+  C_time:   1.0,           // NO TIME COMPRESSION. The clock is real: 1 s of
+                           //     wall clock is 1 s for the train.
+                           //     C existed only because 2000 t at a realistic
+                           //     2500 t/h took 48 minutes. At 100 000 t/h the
+                           //     whole load is 72 s, so the compression has
+                           //     nothing left to do — and it was actively
+                           //     harmful, because every timing window scales as
+                           //     1/C. At C=25 a car filled in 137 ms, well
+                           //     inside human reaction time. At C=1 it is 3.6 s.
                            //     See SPEC.md §3.1.
   h_step:   1 / 240,       // s of SIMULATED time. Accuracy then does not depend
-                           //     on C or on display refresh rate. 100 steps per
-                           //     rendered frame at 60 fps and C=25.
+                           //     on C or on display refresh rate. 4 steps per
+                           //     rendered frame at 60 fps and C=1.
   max_catchup_frames: 3,   // Accumulator clamp: a stalled tab cannot spiral.
 
   // --- adaptive substepping (SPEC §4.1) -----------------------------------
@@ -2299,11 +2304,14 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'deliberate idealisation, and it has a consequence you will feel ' +
         'immediately: <b>the train never slows down on its own.</b> Every stop ' +
         'has to be braked.</p>' +
-        '<p>Time runs at <b>25×</b>. One second on the clock is twenty-five ' +
-        'seconds for the train. The 150 t locomotive, the 100 t cars and the ' +
-        '2500 t/h chute are all real figures. The locomotive is rated at ' +
-        '<b>0.3 MW</b>, which is deliberately about ten times weaker than a real ' +
-        'road freight unit — a yard shunter, not a line-haul engine.</p>' },
+        '<p><b>Time is real.</b> One second on the clock is one second for the ' +
+        'train — there is no speeding up or slowing down of the simulation.</p>' +
+        '<p>The 150 t locomotive and the 100 t cars are real figures. Two things ' +
+        'are not: the chute runs at <b>100 000 t/h</b>, about forty times a real ' +
+        'grain terminal, and the locomotive is rated at only <b>30 kW</b>. Both ' +
+        'are deliberate. A realistic chute takes 144 s to fill one car, which ' +
+        'would mean creeping at 0.1 m/s and feeling nothing; at this rate the ' +
+        'grain fights you hard enough to matter.</p>' },
     { h: 'The physics — loading costs you speed', draft: true,
       html:
         '<p>Grain leaves the chute with <b>no forward speed</b>. When it lands in ' +

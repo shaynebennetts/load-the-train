@@ -336,7 +336,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 | Grain bulk density | **0.77 t/m³** | Wheat. Sets the visual fill height: 100 t → 129.9 m³, against a 15.5 × 3.0 × 2.8 m interior = 130.2 m³. Consistent to 0.3 %. |
 | Approach distance | **30 m** | **Departs from the brief's 1 km. See §3.2.** |
 | Track extent | **−60 m to +700 m** | Chute at `x = 0`, loco nose starts at `x = −30`. Train is 361 m long. Car 20's trough reaches the chute with the nose at `+345.5 m`, and its centre sits under the chute at `+353.25 m` (corrected at task 6 from an earlier estimate of +340 m). ~347 m of spare beyond, ample for free shunting. No buffer stops. |
-| **Time compression `C`** | **25** | See §3.1. |
+| **Time compression `C`** | **1** — none | The clock is real. See §3.1. |
 
 Derived, for reference:
 
@@ -350,38 +350,48 @@ Derived, for reference:
 | Launch acceleration, loaded | 0.1628 m/s² |
 | Tractive effort at 1 m/s (full) | 30.0 kN |
 | Stopping distance from 1 m/s, tare / loaded | 7.9 m / 30.1 m |
-| Time to fill one car | 3.60 s sim = **0.144 s wall** |
-| Time to fill all twenty | 72.0 s sim = **2.88 s wall** |
+| Time to fill one car | 3.60 s (3.42 s to 95 %) |
+| Time to fill all twenty | 72.0 s |
 | Max speed to fill a car in one pass | 4.306 m/s |
 | Accretion drag at 1 m/s | 27.8 kN |
 | Loading terminal speed `sqrt(P/ṁ)` | 1.039 m/s |
 
 ### 3.1 The timescale choice — stated explicitly
 
-**All physical parameters are realistic and unmodified.** The clock alone is compressed, by
-an explicit factor
+**There is no time compression. `C = 1`: one second of wall clock is one second for the
+train.** The clock is honest and nothing in the simulation is sped up or slowed down.
 
-```
-C = 25        1 second of wall clock = 25 seconds of simulated time
-```
+Earlier versions of this document specified `C = 25`, because 2000 t at a realistic
+2500 t/h takes 48 minutes and that is not a game. The brief's §3.8 offered three ways out —
+compress time, reduce car capacity, or raise the flow rate — and this build initially took
+the first. It now takes the third instead (§3.2): at 100 000 t/h the whole load is 72 s, so
+the compression had nothing left to do.
 
-Loading 2000 t at 2500 t/h takes 48 minutes of simulated time, which is not a game. At
-C = 25 that is 115 s of wall clock for the loading alone; with the approach and shunting, a
-complete run is roughly 2.5 to 3.5 minutes.
+Removing it was not merely tidy, it was necessary. **Every timing window in the game scales
+as `1/C`**, and with the flow rate raised 40× the windows had become unplayable:
 
-Consequences, all accepted deliberately:
+| window | at `C = 25` | at `C = 1` |
+|---|---|---|
+| fill one car to 95 % | 137 ms | **3.42 s** |
+| coupling gap passes, at 0.5 m/s | 120 ms | 3.00 s |
+| coupling gap passes, at 1.0 m/s | 60 ms | 1.50 s |
+| car under the chute, at 1.0 m/s | 620 ms | 15.5 s |
 
-- Nothing in the physics is faked. Masses, power, adhesion, brake ratio and flow rate are
-  all real figures inside their stated ranges.
-- Simulated speeds are real speeds. A 0.4 m/s crawl is a real 0.4 m/s crawl; it merely
-  appears 25× faster on screen.
-- The physics step is defined in **simulated** seconds (§4), so accuracy is unaffected by C.
-- Both clocks are on the HUD: wall time as the primary figure, simulated time beside it.
-  The intro states the factor.
+A 137 ms fill window is shorter than human reaction time, so the chute could not be opened
+and shut for a single car at all. The design requirement, set by Shayne, is that filling a
+car take **at least 3 s of wall clock**; `C = 1` gives 3.42 s.
 
-**This is not a silent use of unphysical numbers.** Two other routes were considered and
-rejected: raising the flow rate to ~60,000 t/h (24× any real terminal), and cutting car
-capacity to ~10 t (a farm trailer, and it weakens the accretion term the game is about).
+Consequences, all accepted:
+
+- The physics step stays `h = 1/240 s` of simulated time, which is now also 1/240 s of wall
+  clock: **4 steps per rendered frame at 60 fps**, down from 100. Accuracy is unchanged and
+  the cost is negligible.
+- Simulated speeds are real speeds and now *look* like real speeds. A 1 m/s crawl reads as
+  a 1 m/s crawl.
+- **The train feels 25× more sluggish than it did**, because perceived responsiveness goes
+  as `C × v` and `C` fell by 25. Full throttle from rest now covers 0.18 m in the first
+  second and takes 29 s to cover the 30 m approach. The 100× power cut of §3.2 was made to
+  tame twitchiness at `C = 25` and is, at `C = 1`, an overcorrection. See open point 6.
 
 ### 3.2 Departures from the brief's own text
 
@@ -831,3 +841,20 @@ Flagged rather than decided, for Shayne's call:
    are deliberate playability calls made on play feedback, and both are departures from the
    brief's own text rather than from something it left open.
 5. **Physics wording in the intro is a draft** for you to replace (§5.8), marked in the file.
+6. **Rated power is now very likely too low.** `P = 30 kW` was chosen in two steps to tame
+   the train at `C = 25`; removing the compression has made the train 25× more sluggish
+   again, and full throttle from rest now covers 0.18 m in the first second. Raising it
+   trades directly against how much the accretion drag dominates, through the loading
+   terminal speed `v_eq = sqrt(P/ṁ)`:
+
+   | `P` | `v_eq` | first second from rest | 30 m approach |
+   |---|---|---|---|
+   | 30 kW | 1.04 m/s | 0.18 m | 29 s |
+   | 120 kW | 2.08 m/s | 0.39 m | ~19 s |
+   | 250 kW | 3.00 m/s | 0.56 m | ~14 s |
+   | 500 kW | 4.24 m/s | 0.79 m | ~11 s |
+
+   The maximum speed at which a car can still be filled in one pass is 4.31 m/s, so beyond
+   about 500 kW the train can outrun the chute and the drag stops being the binding
+   constraint. **250–300 kW is the recommended band**: responsive, and still firmly
+   drag-dominated.
