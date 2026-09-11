@@ -450,7 +450,7 @@ const geometry = (() => {
 // ===========================================================================
 const ledger = (() => {
 
-  function create(st) {
+  function create(st, ke0) {
     return {
       // mass, kg
       m_released: 0,        // flow rate x open time
@@ -459,7 +459,12 @@ const ledger = (() => {
       m_ground: 0,
       m_cars_0: st ? st.m_grain : 0,   // grain already aboard when we started
       worst_step_mass_residual: 0,
-      // energy — task 8
+      // energy, J
+      KE_0: ke0 || 0,       // total kinetic energy when the ledger was armed
+      W_traction: 0,        // + integral F_traction . v dt
+      W_brake: 0,           // + integral |F_brake . v| dt, energy REMOVED
+      E_diss: 0,            // + integral 0.5 v^2 (dM/dt) dt
+      J_acc: 0,             // + integral v (dM/dt) dt, N s — Test 4 cross-check
       n: 0,
     };
   }
@@ -479,25 +484,98 @@ const ledger = (() => {
     L.m_released += s.dm_released;
     L.m_captured += s.dm_captured;
     L.m_ground   += s.dm_ground;
+
+    // --- energy -----------------------------------------------------------
+    // Quadrature: Simpson across the substep, using the four RK4 stage samples.
+    // k[0] sits at tau = 0, k[1] and k[2] at tau = dt/2, k[3] at tau = dt, so
+    // with mid = (k1+k2)/2 Simpson's (a + 4 mid + b)/6 becomes
+    // (a + 2 k1 + 2 k2 + b)/6. Choosing a quadrature rule is a numerical
+    // decision; the PHYSICS below comes from SPEC §2.7 route 2 alone.
+    const k = s.stages, dt = s.dt;
+    const simp = (a, m1, m2, b) => dt * (a + 2 * m1 + 2 * m2 + b) / 6;
+
+    L.W_traction += simp(k[0].Ft * k[0].v, k[1].Ft * k[1].v,
+                         k[2].Ft * k[2].v, k[3].Ft * k[3].v);
+    // F_brake always opposes v, so Fb.v is negative and this is the positive
+    // energy the brakes removed. Reported as the integral of F_brake . v, never
+    // as a power figure (SPEC §2.5).
+    L.W_brake    -= simp(k[0].Fb * k[0].v, k[1].Fb * k[1].v,
+                         k[2].Fb * k[2].v, k[3].Fb * k[3].v);
+
+    // Dissipation. Derived in SPEC §2.7 ROUTE 2, the perfectly inelastic
+    // collision, and written from that argument alone:
+    //
+    //   a parcel dm at rest merging with mass M moving at v gives
+    //     v' = Mv/(M+dm)
+    //     KE after = 0.5 M^2 v^2/(M+dm) = 0.5 M v^2 - 0.5 v^2 dm + O(dm^2)
+    //   so exactly 0.5 * v^2 * dm of kinetic energy is destroyed.
+    //
+    // THE HALF IS THE WHOLE POINT. The train gives up v^2 dm; half of that
+    // becomes kinetic energy of the grain (which is already inside 0.5 M v^2,
+    // because M includes loaded grain) and half is destroyed here. Grain that
+    // misses a car is never accelerated, so dm_captured — not dm_released — is
+    // what appears.
+    if (s.dm_captured > 0) {
+      // The RK4 stages carry momentum to the substep midpoint but hold M at the
+      // substep entry, so k[1].v and k[2].v are half a mass-step stale. Taking
+      // v at the MASS midpoint, M + dm/2, costs one divide and moves this
+      // integral from first order in dm/M to second:
+      //   exact per step   0.5 p^2 dm / (M_n * M_n+1)
+      //   entry-mass v     0.5 p^2 dm / M_n^2          high by (1 + dm/M)
+      //   midpoint-mass v  0.5 p^2 dm / (M_n + dm/2)^2 off by (dm/2M)^2
+      // Measured on Test 4a: 4.1e-6 -> 4.2e-12.
+      const v_mid = 0.5 * (k[1].v + k[2].v) * s.M / (s.M + 0.5 * s.dm_captured);
+      L.E_diss += 0.5 * v_mid * v_mid * s.dm_captured;
+      L.J_acc  += v_mid * s.dm_captured;
+    }
   }
 
   // Test 1 (SPEC §7.1):  m_released == m_cars + m_ground
-  function report(L, st) {
+  // Test 2 (SPEC §7.2):  W_traction - W_brake == dKE_total + E_diss
+  //
+  // `kin` carries the CURRENT total kinetic energy. Both identities are checked
+  // here, never assumed.
+  function report(L, st, kin) {
     const m_cars = st.m_grain - L.m_cars_0;
-    const rhs = m_cars + L.m_ground;
-    const resid = L.m_released - rhs;
-    const rel = L.m_released > 0 ? Math.abs(resid) / L.m_released : 0;
+    const rhs_m = m_cars + L.m_ground;
+    const resid_m = L.m_released - rhs_m;
+    const rel_m = L.m_released > 0 ? Math.abs(resid_m) / L.m_released : 0;
     // Second route: the ledger's own captured total against the cars' own state.
     const split = Math.abs(L.m_captured - m_cars);
+
+    const KE = kin === undefined ? 0 : kin;
+    const dKE = KE - L.KE_0;
+    const lhs_e = L.W_traction - L.W_brake;
+    const rhs_e = dKE + L.E_diss;
+    const resid_e = lhs_e - rhs_e;
+    // Normalise by the largest term present, so the measure stays meaningful
+    // when traction and brake are both zero (Test 4's coasting case, where the
+    // left side is exactly zero and dKE balances E_diss on the right).
+    const scale = Math.max(Math.abs(L.W_traction), Math.abs(L.W_brake),
+                           Math.abs(dKE), Math.abs(L.E_diss));
+
     return {
+      // --- Test 1 ---
       m_released: L.m_released,
       m_cars, m_ground: L.m_ground,
       m_captured_by_ledger: L.m_captured,
-      mass_residual: resid,
-      mass_closure: rel,
+      mass_residual: resid_m,
+      mass_closure: rel_m,
       mass_per_car_split_residual: split,
       worst_step_mass_residual: L.worst_step_mass_residual,
       loss_fraction: L.m_released > 0 ? L.m_ground / L.m_released : 0,
+      // --- Test 2 ---
+      W_traction: L.W_traction,
+      W_brake: L.W_brake,
+      KE_0: L.KE_0, KE: KE, dKE,
+      E_diss: L.E_diss,
+      energy_lhs: lhs_e, energy_rhs: rhs_e,
+      energy_residual: resid_e,
+      energy_closure: scale > 0 ? Math.abs(resid_e) / scale : 0,
+      energy_closure_vs_traction: Math.abs(L.W_traction) > 0
+        ? Math.abs(resid_e) / Math.abs(L.W_traction) : null,
+      // --- Test 4 cross-check ---
+      J_acc: L.J_acc,
       substeps: L.n,
     };
   }
@@ -521,22 +599,34 @@ const LTT = {
   reset(over) {
     _st = physics.create(over);
     _ctl = Object.assign({}, CTL_NEUTRAL);
-    _st.L = ledger.create(_st);
+    _st.L = ledger.create(_st, 0);
     return LTT;
   },
 
   // Re-arm the ledger at the CURRENT state, so a test can position the train
   // and pre-load cars first and still measure only what it meant to measure.
-  arm() { physics.resync(_st); _st.L = ledger.create(_st); return LTT; },
+  arm() {
+    physics.resync(_st);
+    const v = physics.speed(_st);
+    _st.L = ledger.create(_st, 0.5 * physics.mass(_st) * v * v);
+    return LTT;
+  },
 
-  ledger() { return ledger.report(_st.L, _st); },
+  ledger() {
+    const v = physics.speed(_st);
+    return ledger.report(_st.L, _st, 0.5 * physics.mass(_st) * v * v);
+  },
 
   // Run a list of segments, each {t, ...controls}. Controls persist between
   // segments; x / v / fill may be set at a segment boundary. This is how the
   // scripted sequences of SPEC §7.1 and §7.2 are driven.
   runScript(segs) {
+    let first = true;
     for (const g of segs) {
       LTT.setState(g);
+      // Arm once the opening conditions are in place, so KE_0 is the kinetic
+      // energy the run actually starts with.
+      if (first) { LTT.arm(); first = false; }
       physics.advance(_st, _ctl, g.t || 0);
     }
     return LTT.ledger();
@@ -587,7 +677,7 @@ const LTT = {
       if (extra < 0) throw new Error('M below bare train mass ' + bare);
       _st.fill[0] = extra;
       physics.resync(_st);
-      _st.L = ledger.create(_st);
+      _st.L = ledger.create(_st, 0);
       if ('v' in o) _st.p = o.v * physics.mass(_st);
     }
     if ('v0' in o) _st.p = o.v0 * physics.mass(_st);
