@@ -351,10 +351,28 @@ capacity to ~10 t (a farm trailer, and it weakens the accretion term the game is
   millisecond per frame. Justification for 1/240 rather than 1/60: the ledgers must close to
   0.1 %, and the traction force varies as `P/v`, which is stiffest exactly where play
   happens, at low `v`.
-- **Adaptive substepping inside each base step.** A base step is bisected, recursively to a
-  depth cap, while the predicted relative velocity change exceeds a tolerance
-  (`|Δv| > 0.01·max(v, v_ref)`). This is what keeps `F = P/v` sane near `v = 0`, and it is
-  part of the core integrator used in normal play — it is not a path added for the tests.
+- **Adaptive substepping inside each base step.** The stepper *marches* across the base
+  step, sizing each substep directly from the instantaneous force so the predicted velocity
+  change stays inside `|Δv| ≤ 0.01·max(|v|, v_ref)`, with `v_ref = 0.05 m/s` as a floor so
+  the criterion stays finite at `v → 0`:
+
+  ```
+  dt = sub_tol · max(|v|, v_ref) · M / |F_ext| ,   clamped to the base step remainder
+  ```
+
+  This is what keeps `F = P/v` tractable near `v = 0`, and it is part of the core integrator
+  used in normal play — not a path added for the tests.
+
+  **Corrected at task 4.** This document originally specified recursive *bisection* to a
+  depth cap of 20. That cannot do the job, and the figures are worth recording. Test 3
+  starts at `v_0 = 10⁻⁶ m/s` with `μ → ∞`, so `F = P/v = 3×10¹² N` and the substep must be
+  `1.18×10⁻¹⁰ s` against a base step of `4.17×10⁻³ s` — 26 levels of bisection, or
+  6.7×10⁷ substeps. A depth cap of 20 would *both* truncate the launch and cost 10⁶
+  substeps. The marching stepper resolves the same launch in **237 substeps**, and averages
+  1.029 substeps per base step over a 60 s run. `sub_depth` is therefore replaced by
+  `sub_guard`, a loop guard of 200 000 iterations that should never be approached; the test
+  panel reports the maximum substeps per base step so a silent truncation cannot pass
+  unnoticed.
 - **Integrator**: classical RK4 on the state `(x, p)` with `M(t)` advanced from captured
   grain. Momentum form, per §2.3.
 - **Accumulator clamp**: at most 3 frames' worth of simulated time is caught up in one

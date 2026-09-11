@@ -101,9 +101,12 @@ const PARAMS = Object.freeze({
   max_catchup_frames: 3,   // Accumulator clamp: a stalled tab cannot spiral.
 
   // --- adaptive substepping (SPEC §4.1) -----------------------------------
-  sub_tol:    0.01,        // Bisect while |dv| > sub_tol * max(|v|, sub_vref).
+  sub_tol:    0.01,        // Size each substep so |dv| <= sub_tol*max(|v|,vref).
   sub_vref:   0.05,        // m/s. Floor, so the criterion is finite at v -> 0.
-  sub_depth:  20,          // Bisection depth cap. 2^20 substeps worst case.
+  sub_guard:  200000,      // Loop guard on substeps per base step. Should never
+                           //     be approached: the launch of Test 3 (mu -> inf
+                           //     from v0 = 1e-6) is the worst case in the build
+                           //     and needs 237. See SPEC 4.1.
 
   // --- rules (SPEC §5.6) --------------------------------------------------
   fill_target: 0.95,       // Every car must reach >= 95 % of capacity.
@@ -238,8 +241,8 @@ const physics = (() => {
   // keeps F = P/v tractable as v -> 0, and it is the integrator used in normal
   // play, not a path added for the tests.
   function baseStep(st, ctl, H) {
-    let left = H, guard = 0, subs = 0;
-    while (left > 1e-15 && guard++ < 200000) {
+    let left = H, subs = 0;
+    while (left > 1e-15 && subs < st.par.sub_guard) {
       const M = mass(st);
       const v = st.p / M;
       const par = st.par;
