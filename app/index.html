@@ -285,8 +285,18 @@ const PARAMS = Object.freeze({
   L_pitch:  17.0,          // m, over couplers. Gives a 1.5 m gap, 8.82 % duty.
 
   // --- chute --------------------------------------------------------------
-  mdot:     2500000 / 3600, // kg/s = 694.444. Mid of the brief's 1500-3000 t/h.
-                            //     A real grain terminal rate, unmodified.
+  mdot:     40 * 2500000 / 3600,
+                           // kg/s = 27777.8, i.e. 100 000 t/h. FORTY TIMES the
+                           //     brief's 1500-3000 t/h band, and disclosed as
+                           //     such (SPEC 3.2). At a real 2500 t/h a car
+                           //     takes 144 s to fill, so a 15.5 m trough can
+                           //     only be filled in one pass below 0.108 m/s —
+                           //     at which speed the v*dM/dt term the whole
+                           //     brief is built around is 74.7 N against a
+                           //     710 t train, i.e. invisible. Raising the flow
+                           //     is what makes loading-on-the-move possible at
+                           //     all, and with it the accretion drag becomes
+                           //     the dominant force in the game.
   w_chute:  0.8,           // m aperture. Single-spout terminal chute. Narrower
                            //     than the 1.5 m gap, so a gap cannot be
                            //     straddled harmlessly.
@@ -956,11 +966,26 @@ const tests = (() => {
     return { m_loco: M, m_tare: 0 };
   }
 
-  function row(label, got, pred, unit, tol) {
+  // `scale` is required for any row whose expected value is exactly zero.
+  //
+  // A cancellation check like "dKE + E_diss must be 0" has nothing to divide by,
+  // and the original code fell back to the raw absolute difference — comparing
+  // a quantity in joules against a dimensionless 0.1 % tolerance. That is not a
+  // test of anything: it passes or fails purely on the units and magnitude of
+  // the run. Raising the chute flow 40x multiplied E_diss by 40, the absolute
+  // residual grew with it, and Test 4b failed at a reported 2.47e-3 while the
+  // true relative error was 4.1e-9. Such rows now supply the magnitude of the
+  // terms being cancelled and are judged against that.
+  function row(label, got, pred, unit, tol, scale) {
     let relerr = null, pass = true;
     if (pred !== null && pred !== undefined) {
       const d = Math.abs(got - pred);
-      relerr = Math.abs(pred) > 0 ? d / Math.abs(pred) : d;
+      const den = Math.abs(pred) > 0 ? Math.abs(pred) : Math.abs(scale || 0);
+      if (Math.abs(pred) === 0 && !(den > 0)) {
+        throw new Error('row("' + label + '"): expected value is 0 and no scale ' +
+                        'was given, so no relative error can be formed');
+      }
+      relerr = d / den;
       pass = relerr <= (tol === undefined ? PARAMS.test_tol : tol);
     }
     return { label, got, pred, unit: unit || '', relerr, pass };
@@ -981,7 +1006,8 @@ const tests = (() => {
       info('grain in cars',               L.m_cars,     'kg'),
       info('grain on the ground',         L.m_ground,   'kg'),
       row('cars + ground  vs  released', L.m_cars + L.m_ground, L.m_released, 'kg'),
-      row('worst SINGLE-STEP residual',  L.worst_step_mass_residual, 0, 'kg', 1e-6),
+      row('worst SINGLE-STEP residual',  L.worst_step_mass_residual, 0, 'kg', 1e-9,
+          PARAMS.mdot * PARAMS.h_step),
       row('ledger total vs per-car sum', L.m_captured_by_ledger, L.m_cars, 'kg', 1e-9),
       info('loss as a fraction of released', L.loss_fraction, ''),
       info('substeps taken',              L.substeps, ''),
@@ -1010,7 +1036,7 @@ const tests = (() => {
       row('right side  ΔKE + E_diss  vs  left side', L.energy_rhs, L.energy_lhs, 'J'),
       info('residual',                   L.energy_residual, 'J'),
       info('closure as a fraction of W_traction', L.energy_closure_vs_traction, ''),
-      row('mass closure on the same run', L.mass_closure, 0, '', PARAMS.test_tol),
+      row('mass closure on the same run', L.mass_closure, 0, '', PARAMS.test_tol, 1),
       info('grain spilled (in neither energy term)', L.m_ground, 'kg'),
     ], [
       'ΔKE_total uses the full instantaneous mass including loaded grain.',
@@ -1143,7 +1169,7 @@ const tests = (() => {
                      (Math.round(t * 1e4) / 1e4) + ' s open', NaN, ''));
       if (V.full) {
         rows.push(row('  M_final (100 % capture expected)', Mf, M0 + p.mdot * t, 'kg', 1e-12));
-        rows.push(row('  grain spilled', L.m_ground, 0, 'kg', 1e-6));
+        rows.push(row('  grain spilled', L.m_ground, 0, 'kg', 1e-9, L.m_cars));
       } else {
         rows.push(info('  M_final (measured)', Mf, 'kg'));
         rows.push(info('  grain spilled across gaps', L.m_ground, 'kg'));
@@ -1154,8 +1180,9 @@ const tests = (() => {
       rows.push(row('  ΔKE', L.dKE, -dsP, 'J'));
       rows.push(row('  E_diss', L.E_diss, dsP, 'J'));
       rows.push(row('  J_acc = p·ln(M_f/M_0)', L.J_acc, JP, 'N s'));
+      // Normalised against the magnitude of the two terms that must cancel.
       rows.push(row('  cross-check ΔKE + E_diss', L.dKE + L.E_diss, 0, 'J',
-                     PARAMS.test_tol * Math.abs(dsP) / Math.max(Math.abs(dsP), 1e-30)));
+                     undefined, dsP));
     }
     notes.push('Mv is constant while coasting, so v_final and the KE ratio follow');
     notes.push('from M_final with no integration at all. The momentum-form');

@@ -327,7 +327,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 | Car tare `m_tare` | **28 t** | Mid of the brief's 25–30 t. |
 | Car capacity `m_cap` | **100 t** | Top of the brief's 60–100 t, chosen so the 20 × 100 t = 2000 t figure matches the brief's own timescale arithmetic. |
 | Number of cars `N` | **20** | Given. |
-| Chute flow `ṁ_flow` | **2500 t/h** = 694.444 kg/s | Mid of the brief's 1500–3000 t/h. A real grain terminal rate, unmodified. |
+| Chute flow `ṁ_flow` | **100 000 t/h** = 27 777.8 kg/s | **40× the brief's 1500–3000 t/h band. See §3.2.** At a real rate the accretion term is unobservable; see below. |
 | Chute aperture `w` | **0.8 m** | A single-spout terminal loading chute. Narrow relative to the 1.5 m gap, so a gap cannot be straddled harmlessly. |
 | Chute lip height | **4.0 m** above car rim | Visual only; instantaneous landing (decision 5). |
 | Car body length `L_body` | **15.5 m** | Open trough length of a large covered hopper. |
@@ -350,8 +350,11 @@ Derived, for reference:
 | Launch acceleration, loaded | 0.1628 m/s² |
 | Tractive effort at 1 m/s (full) | 30.0 kN |
 | Stopping distance from 1 m/s, tare / loaded | 7.9 m / 30.1 m |
-| Time to fill one car | 144.0 s sim = **5.76 s wall** |
-| Time to fill all twenty | 2880 s sim = 48.0 min sim = **115.2 s wall** |
+| Time to fill one car | 3.60 s sim = **0.144 s wall** |
+| Time to fill all twenty | 72.0 s sim = **2.88 s wall** |
+| Max speed to fill a car in one pass | 4.306 m/s |
+| Accretion drag at 1 m/s | 27.8 kN |
+| Loading terminal speed `sqrt(P/ṁ)` | 1.039 m/s |
 
 ### 3.1 The timescale choice — stated explicitly
 
@@ -399,6 +402,27 @@ at μ = 0.30.
 holding full power with nothing to judge and nothing to learn. The approach was never where
 the physics lived; the chute is. Total travel over a full run is still 383.3 m, because the
 train is 361 m long and every car has to reach the chute.
+
+**Chute flow 100 000 t/h, against the brief's 1500–3000 t/h — 40× higher.** This one is
+forced by the brief's own physics. At a realistic 2500 t/h a 100 t car takes 144 s to fill,
+while its trough is only 15.5 m long, so a car can be filled in a single pass only below
+0.108 m/s. At that speed the `v·dM/dt` term the entire brief is built around is **74.7 N**
+against a 710 t train — a deceleration of 1.05×10⁻⁴ m/s², invisible. The realistic flow rate
+makes the headline effect unobservable, and makes stop-and-fill the only viable strategy,
+in which case `v = 0` and there is no accretion drag at all.
+
+At 100 000 t/h a car fills in 3.6 s and can be filled in one pass at up to 4.31 m/s. The
+accretion drag at 1 m/s is then **27.8 kN**, comparable with the 30 kN of tractive effort
+available at that speed — so the two balance, and full throttle with the chute open has an
+emergent terminal speed
+
+```
+v_eq = sqrt( P_rated / ṁ_flow ) = sqrt( 30 kW / 27 777.8 kg/s ) = 1.039 m/s
+```
+
+which is a genuinely pleasing consequence of the model rather than anything that was put
+in. This is the brief's §3.8 trade-off taken in the direction it left open: it names
+raising the flow rate as one of the three permitted ways to fix the timescale.
 
 **No friction brake** (§2.5) is a third departure, though the brief only constrained how a
 brake must be modelled rather than requiring one. The regenerative model still satisfies
