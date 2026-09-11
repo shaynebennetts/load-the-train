@@ -79,6 +79,13 @@ what makes `P/v` tractable near `v = 0`.
   max depth reached; it must stay under the cap.
 
 ### Task 5 — brake as a force
+
+> **Superseded by the control-fidelity pass.** The friction brake was removed entirely:
+> retardation is now regenerative, i.e. the single bipolar throttle pushed to the opposite
+> sign, and `braking()` no longer exists. `SPEC.md` §2.5 is rewritten. The acceptance below
+> is kept as the record of what was built and verified at the time; the replacement check is
+> `s_stop = M|v|³/(3P)`, measured to within 0.12 % at both 710 t and 2710 t.
+
 Add `F_brake = brake_demand · min(k_b·M·g, μ·M·g)` per §2.5. Never a constant power.
 
 - **Done:** deceleration is 1.1768 m/s² at any mass and any brake-limited speed.

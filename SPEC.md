@@ -113,40 +113,86 @@ or overflows a full one, never joins `M` and never appears in the momentum or en
 ### 2.4 Traction and the adhesion limit
 
 ```
-F_traction = min( P_available / v , μ · m_driven · g ) · throttle_sign
+F_traction = throttle · min( P_rated / v , μ · m_driven · g ) · direction
 ```
 
-`P_available = throttle · P_rated`. The adhesion cap is mandatory: `P/v` diverges as
-`v → 0`, which without the cap produces either an instantaneous launch or a NaN at `t = 0`.
+**The throttle commands a fraction of the available tractive effort**, which is what a
+locomotive controller actually does: at low speed the notch sets tractive effort against a
+current limit, and only at higher speed does the power rating become binding. Adhesion caps
+the maximum either way.
 
-With the parameters of §3, the cap binds below
+**Corrected during the control-fidelity pass.** This document originally had the throttle
+scaling only the power term, `min(throttle·P/v, μ·m_driven·g)`. That is wrong, and it made the
+game nearly unplayable: below `throttle · v_c` the `min()` always selected the adhesion cap,
+so **1 % throttle and 100 % throttle both produced the full 441.30 kN**. The throttle had no
+authority whatsoever from rest. Measured on the corrected law, from rest at tare mass, over
+one second of wall clock (25 s simulated):
+
+| notch | `F_traction` | `a` | reached | travelled |
+|---|---|---|---|---|
+| 5 % | 0.318 m/s | 5.1 m | 0.455 m/s | 14.8 m |
+| 10 % | 0.455 m/s | 7.4 m | 0.646 m/s | 21.3 m |
+| 25 % | 0.724 m/s | 12.0 m | 1.026 m/s | 34.0 m |
+| 50 % | 1.026 m/s | 17.0 m | 1.452 m/s | 48.3 m |
+| 100 % | 1.452 m/s | 24.1 m | 2.054 m/s | 68.4 m |
+
+(columns: speed and distance after one and after two seconds of wall clock)
+
+A 50 % notch held for one second moves the train 17.0 m, exactly one car pitch, so placing
+the next car under the chute is a judgeable act rather than a lottery. Tractive effort at
+1 m/s is 30 kN against a 441.30 kN adhesion cap, so the train is power-limited over the
+entire working range.
+
+The adhesion cap is still mandatory: `P/v` diverges as `v → 0`, which without it produces
+either an instantaneous launch or a NaN at `t = 0`. With the parameters of §3 it binds below
 
 ```
-v_c = P_rated / (μ · m_driven · g) = 3.0 MW / 441.30 kN = 6.798 m/s
+v_c = P_rated / (μ · m_driven · g) = 30 kW / 441.30 kN = 0.06798 m/s
 ```
 
-so **adhesion governs every launch and every low-speed shunt**, which is the whole of normal
-play. Constant power only governs the 1 km approach run.
+so the train is **power-limited across essentially the whole working speed range**, and
+adhesion governs only the first moment off the mark.
 
-### 2.5 Brake
+### 2.5 Retardation — regenerative, not friction
 
-Modelled as a **force**, never as a constant power — a constant-power brake misbehaves at low
-speed for exactly the reason traction does.
+**There is no friction brake.** The locomotive has one bipolar control. Pushing it to the
+opposite sign while rolling puts the traction motors into generation: same machine, same
+rating, same adhesion cap, opposite direction. So retardation is not a separate model at
+all — it is `traction()` with a negative argument, and the code has no brake function.
 
 ```
-F_brake = brake_demand · min( k_b · M · g , μ · M · g )
+F = throttle · min( P_rated / |v| , μ · m_driven · g )        throttle ∈ [−1, +1]
 ```
 
-with `brake_demand ∈ [0, 1]`. All axles of loco and cars are braked, so the braked weight is
-the full instantaneous train weight, including loaded grain — a heavier train brakes with
-proportionally more force and the deceleration `k_b·g` is mass independent.
+This still meets the brief's two requirements on braking. It is a **force**, not a constant
+power; and it is **adhesion-limited**, capped at 441.30 kN, so it does not diverge as
+`v → 0` the way a naive constant-power brake would. The `min()` is what guarantees that.
 
-`k_b = 0.12` and `μ = 0.30`, so the design brake ratio binds and the adhesion cap never
-does. The `min()` is implemented regardless, because it is structurally the correct
-statement and because a wet-rail variant would make it bind. This is disclosed rather than
-hidden: with the shipped numbers, the adhesion branch of the brake is unreachable.
+**The consequence the player feels.** Retarding effort falls off as `1/v`, and kinetic
+energy is removed at constant power, so `v²` falls linearly and the stopping distance is
 
-Brake energy is reported as `∫ F_brake · v dt`, never as a power figure.
+```
+s_stop = M · |v|³ / (3 · P_rated)
+```
+
+strongly mass dependent, unlike the friction brake it replaced:
+
+| speed | empty, 710 t | loaded, 2710 t |
+|---|---|---|
+| 0.5 m/s | 1.0 m | 3.8 m |
+| 1.0 m/s | 7.9 m | 30.1 m |
+| 2.0 m/s | 63.1 m | 241.0 m |
+
+A loaded train needs 30 m to stop from 1 m/s, roughly two car pitches. With no friction
+brake to fall back on, creeping is not optional — which suits a game whose whole action is
+placing a 15.5 m trough under a 0.8 m chute.
+
+Holding reverse effort through `v = 0` correctly drives the train backwards; there is no
+clamp, because reversing is what that control does. Effort is continuous through zero, so
+the integrator needs no special case.
+
+Energy is reported as the signed integral of `F·v`, split by sign: `W_traction` where the
+motors drive, `W_regen` where they generate and give energy back. Never as a power figure.
 
 ### 2.6 Momentum
 
@@ -226,8 +272,8 @@ independent accumulation:
 
 | Symbol | Accumulated as |
 |---|---|
-| `W_traction` | `Σ F_traction · v · h` |
-| `W_brake` | `Σ F_brake · v · h` |
+| `W_traction` | `Σ max(F·v, 0) · h`, the energy the motors put in |
+| `W_regen` | `−Σ min(F·v, 0) · h`, the energy the motors took back |
 | `E_diss` | `Σ ½ v² · dm_captured` |
 | `KE(t)` | evaluated directly as `½ M v²`, not accumulated |
 | `m_released` | `Σ ṁ_flow · h` while the chute is open |
@@ -276,9 +322,8 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 |---|---|---|
 | Locomotive mass `m_loco` | **150 t** | Mid of the brief's 120–200 t. A six-axle Co-Co road freight unit. |
 | Driven mass `m_driven` | **150 t** | All six axles driven, so the full loco mass sits on driven axles. Cars are unpowered. |
-| Rated power `P_rated` | **3.0 MW** | Mid of the brief's 2–4.5 MW. ~4000 hp, an ordinary road freight rating. |
+| Rated power `P_rated` | **0.03 MW** = 30 kW | **Deliberately 100× below the brief's 2–4.5 MW band. See §3.2.** A yard shunter, not a line-haul unit. Cut 10×, then 10× again on play feedback. |
 | Adhesion coefficient `μ` | **0.30** | Mid of the brief's 0.25–0.35 for dry rail with sanding. Gives `F_adhesion = 441.30 kN`. |
-| Brake ratio `k_b` | **0.12** | Deceleration `k_b·g = 1.177 m/s²`, in the normal band for a fully braked freight consist. Comfortably under `μ`, so wheels do not slide. |
 | Car tare `m_tare` | **28 t** | Mid of the brief's 25–30 t. |
 | Car capacity `m_cap` | **100 t** | Top of the brief's 60–100 t, chosen so the 20 × 100 t = 2000 t figure matches the brief's own timescale arithmetic. |
 | Number of cars `N` | **20** | Given. |
@@ -289,8 +334,8 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 | Coupler pitch `L_pitch` | **17.0 m** | Gives gap `= 1.5 m`, so gap duty `= 8.82 %` of track length. |
 | Loco length | **21.0 m** | Typical Co-Co over couplers. |
 | Grain bulk density | **0.77 t/m³** | Wheat. Sets the visual fill height: 100 t → 129.9 m³, against a 15.5 × 3.0 × 2.8 m interior = 130.2 m³. Consistent to 0.3 %. |
-| Approach distance | **1000 m** | Given. |
-| Track extent | **−1100 m to +700 m** | Chute at `x = 0`, loco nose starts at `x = −1000`. Train is 361 m long. Car 20's trough reaches the chute with the nose at `+345.5 m`, and its centre sits under the chute at `+353.25 m` (corrected at task 6 from an earlier estimate of +340 m). ~347 m of spare beyond, ample for free shunting. No buffer stops. |
+| Approach distance | **30 m** | **Departs from the brief's 1 km. See §3.2.** |
+| Track extent | **−60 m to +700 m** | Chute at `x = 0`, loco nose starts at `x = −30`. Train is 361 m long. Car 20's trough reaches the chute with the nose at `+345.5 m`, and its centre sits under the chute at `+353.25 m` (corrected at task 6 from an earlier estimate of +340 m). ~347 m of spare beyond, ample for free shunting. No buffer stops. |
 | **Time compression `C`** | **25** | See §3.1. |
 
 Derived, for reference:
@@ -300,12 +345,11 @@ Derived, for reference:
 | Train tare mass | 710 t |
 | Train fully loaded | 2710 t |
 | Adhesion force | 441.30 kN |
-| Adhesion/constant-power crossover `v_c` | 6.798 m/s |
+| Adhesion/constant-power crossover `v_c` | 0.6798 m/s |
 | Launch acceleration, tare | 0.6216 m/s² |
 | Launch acceleration, loaded | 0.1628 m/s² |
-| Braking deceleration | 1.177 m/s², mass independent |
-| Stopping distance from 10 m/s | 42.5 m |
-| Max brake force, tare / loaded | 835.5 kN / 3189.1 kN |
+| Tractive effort at 1 m/s (full) | 30.0 kN |
+| Stopping distance from 1 m/s, tare / loaded | 7.9 m / 30.1 m |
 | Time to fill one car | 144.0 s sim = **5.76 s wall** |
 | Time to fill all twenty | 2880 s sim = 48.0 min sim = **115.2 s wall** |
 
@@ -335,6 +379,30 @@ Consequences, all accepted deliberately:
 **This is not a silent use of unphysical numbers.** Two other routes were considered and
 rejected: raising the flow rate to ~60,000 t/h (24× any real terminal), and cutting car
 capacity to ~10 t (a farm trailer, and it weakens the accretion term the game is about).
+
+### 3.2 Departures from the brief's own text
+
+Two numbers here contradict the brief directly, rather than filling in something it left
+open. Both were made on play feedback from Shayne and both are disclosed here and in the
+player-facing intro.
+
+**Rated power 30 kW, against the brief's 2–4.5 MW band — 100× lower.** With a 30 m approach
+there is no line haul to do: the entire game is low-speed shunting, placing a 15.5 m trough
+under a 0.8 m chute, twenty times. Under 25× time compression a 3 MW unit crossed a car
+pitch faster than anyone could react. Cut 10×, played, cut 10× again. The effect is to move
+the adhesion/power crossover from 6.80 m/s down to 0.068 m/s, so the train is power-limited
+over its entire working range and adhesion governs only the first tenth of a second off the
+mark. Nothing else about the locomotive changed: it is still 150 t on 150 t of driven axles
+at μ = 0.30.
+
+**Approach 30 m, against the brief's 1 km.** At the speeds above, 1 km was a minute of
+holding full power with nothing to judge and nothing to learn. The approach was never where
+the physics lived; the chute is. Total travel over a full run is still 383.3 m, because the
+train is 361 m long and every car has to reach the chute.
+
+**No friction brake** (§2.5) is a third departure, though the brief only constrained how a
+brake must be modelled rather than requiring one. The regenerative model still satisfies
+both of its stated constraints: a force, and adhesion-limited.
 
 ---
 
@@ -423,7 +491,7 @@ grain stream itself drawn either landing in a trough or spilling to the ground.
 - **Accretion retarding force `v·dM/dt`, in kN, as a live bar.** Always on screen, because
   it is the physical heart of the game and the player should watch it grow when loading on
   the move.
-- One tap expands the full ledger panel: `W_traction`, `W_brake`, `ΔKE_total`, `E_diss`, all
+- One tap expands the full ledger panel: `W_traction`, `W_regen`, `ΔKE_total`, `E_diss`, all
   three mass buckets, and the live closure percentages of Tests 1 and 2.
 
 ### 5.3 Controls
@@ -575,11 +643,16 @@ exercised.
 ### 7.2 Test 2 — energy ledger
 
 ```
-W_traction − W_brake  =  ΔKE_total + ½ ∫ v²·(dM/dt) dt
+W_traction − W_regen  =  ΔKE_total + ½ ∫ v²·(dM/dt) dt
 ```
 
+`W_regen` plays the role of the brief's `W_brakes`: it is the energy the motors took back
+out of the train. The split is exact rather than approximate — `max(a,0) + min(a,0) = a`
+identically and Simpson's rule is linear, so `W_traction − W_regen` is exactly the Simpson
+integral of `F·v`.
+
 to within 0.1 %. `ΔKE_total` uses the full instantaneous mass including loaded grain. **Every
-term reported separately**: `W_traction`, `W_brake`, `ΔKE_total`, `E_diss`, and the residual
+term reported separately**: `W_traction`, `W_regen`, `ΔKE_total`, `E_diss`, and the residual
 both as an absolute value and as a fraction of `W_traction`.
 
 Spilled grain enters neither side, which is a cross-check against Test 1: a run with large
@@ -730,8 +803,7 @@ Flagged rather than decided, for Shayne's call:
 3. **Test 3's `v_0 = 10⁻⁶ m/s`** is a departure from "from rest", forced by `P/0`. The exact
    solution with that initial condition is quoted and the difference is `O(v_0²)`, fifteen
    orders below the tolerance — but it is a departure, and is stated as one.
-4. **The brake's adhesion branch is unreachable** with `k_b = 0.12 < μ = 0.30` (§2.5). The
-   `min()` is implemented anyway. If you would rather adhesion actually bind under braking,
-   `k_b` must exceed 0.30, which means a deceleration above 2.94 m/s² — high for a freight
-   consist.
+4. **Power is 100× below the brief's band and the approach is 30 m, not 1 km** (§3.2). Both
+   are deliberate playability calls made on play feedback, and both are departures from the
+   brief's own text rather than from something it left open.
 5. **Physics wording in the intro is a draft** for you to replace (§5.8), marked in the file.

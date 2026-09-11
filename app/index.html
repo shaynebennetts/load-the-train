@@ -78,6 +78,13 @@
           background: var(--sky-hi); }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .stage { position: relative; flex: 1 1 auto; min-height: 0; }
+  .main  { display: flex; flex-direction: column; flex: 1 1 auto;
+           min-width: 0; min-height: 0; }
+  .map   { flex: 0 0 auto; height: 38px; background: #241A13;
+           border-top: 2px solid #4A362A; position: relative; }
+  .map canvas { display: block; width: 100%; height: 100%; }
+  .maplab { position: absolute; left: 5px; top: 1px; font-size: 8px;
+            letter-spacing: .08em; color: #7A6249; pointer-events: none; }
 
   /* fill strip: a row of vertical bars in portrait, a column of horizontal
      bars in landscape, so it never competes with the play view for the scarce
@@ -126,11 +133,11 @@
   .meter .val { font-variant-numeric: tabular-nums; min-width: 68px; }
 
   .caption { position: absolute; left: 50%; transform: translateX(-50%);
-             top: 78px; background: #2A1E16D9; color: #F6EFE3;
+             top: 96px; background: #2A1E16D9; color: #F6EFE3;
              padding: 3px 10px; border-radius: 11px; font-size: 12px;
              font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
   .warn { position: absolute; left: 50%; transform: translateX(-50%);
-          top: 106px; background: var(--barn); color: #fff; padding: 3px 10px;
+          top: 124px; background: var(--barn); color: #fff; padding: 3px 10px;
           border-radius: 11px; font-size: 12px; font-weight: 700; }
 
   /* controls overlay */
@@ -153,6 +160,9 @@
   .slider .zlab { position: absolute; left: 0; right: 0; text-align: center;
                   font-size: 10px; font-weight: 700; color: #F6EFE3;
                   letter-spacing: .06em; opacity: .8; }
+  .slider .knob { display: flex; align-items: center; justify-content: center;
+                  font-size: 12px; font-weight: 800; color: #3B2A1F;
+                  font-variant-numeric: tabular-nums; }
 
   .btn { position: absolute; border-radius: 12px; border: 3px solid #3B2A1F;
          background: #4A362A; color: #F6EFE3; font-weight: 700;
@@ -161,15 +171,11 @@
   .btn.chute { left: 10px; bottom: 12px; min-height: 62px; min-width: 104px;
                font-size: 15px; }
   .btn.chute.on { background: var(--grain); color: #2A1E16; border-color: #8A6B28; }
-  .btn.rev { left: 10px; bottom: 84px; min-height: 44px; min-width: 104px;
-             font-size: 12px; }
-  .btn.rev.on { background: var(--barn); }
-  .btn.rev:disabled { opacity: .45; cursor: default; }
   .btn.done { right: 10px; top: 8px; min-height: 40px; min-width: 70px;
               font-size: 12px; }
   .btn.pause { right: 88px; top: 8px; min-height: 40px; min-width: 52px;
                font-size: 12px; }
-  .btn.ledg { left: 124px; bottom: 12px; min-height: 44px; min-width: 44px;
+  .btn.ledg { left: 10px; bottom: 84px; min-height: 44px; min-width: 44px;
               padding: 0; font-size: 17px; }
 
   /* ledger drawer */
@@ -251,12 +257,22 @@ const PARAMS = Object.freeze({
                            //     road freight unit.
   m_driven: 150000,        // kg. All six axles driven, so the full loco mass
                            //     sits on driven axles. Cars are unpowered.
-  P_rated:  3.0e6,         // W. Mid of the brief's 2-4.5 MW. ~4000 hp.
+  P_rated:  0.03e6,        // W = 30 kW. DELIBERATELY 100x BELOW the brief's
+                           //     2-4.5 MW band, and disclosed as such
+                           //     (SPEC 3.2). Starting 30 m from the chute there
+                           //     is no line haul to do: the whole game is
+                           //     low-speed shunting, and 3 MW under 25x time
+                           //     compression ran the train away faster than
+                           //     anyone could place a car. Cut 10x, then 10x
+                           //     again on play feedback. This drops the
+                           //     adhesion/power crossover from 6.80 m/s to
+                           //     0.068 m/s, so the train is power-limited over
+                           //     the entire working range and adhesion governs
+                           //     only the first tenth of a second off the mark.
+                           //     Tractive effort at 1 m/s is now 30 kN, not the
+                           //     441 kN adhesion cap.
   mu:       0.30,          // Wheel-rail adhesion. Mid of the brief's 0.25-0.35
                            //     for dry rail with sanding. -> F_adh 441.30 kN.
-  k_brake:  0.12,          // Design brake ratio. Decel k_b*g = 1.177 m/s^2, the
-                           //     normal band for a fully braked freight consist.
-                           //     Under mu, so wheels do not slide.
   L_loco:   21.0,          // m, over couplers. Typical Co-Co.
 
   // --- cars ---------------------------------------------------------------
@@ -286,9 +302,14 @@ const PARAMS = Object.freeze({
   car_d:     2.8,          // m interior depth   } give the 130.2 m^3 above
 
   // --- track --------------------------------------------------------------
-  x_start:  -1000.0,       // m. Loco nose 1 km short of the chute. Given.
-  x_min:    -1100.0,       // m } generous, so free shunting never hits a wall.
-  x_max:     700.0,        // m } No buffer stops, no crash state (decision 11).
+  x_start:   -30.0,        // m. Loco nose 30 m short of the chute. The brief
+                           //     said 1 km; that was a minute of holding full
+                           //     power with nothing to do, so it is cut to a
+                           //     short approach (SPEC 3.2). The 1 km figure is
+                           //     the one departure from the brief's own text.
+  x_min:     -60.0,        // m } Nose limits. Car 20 needs the nose at
+  x_max:     700.0,        // m } +353.25 m, so this is ample either way.
+                           //     No buffer stops, no crash state (decision 11).
 
   // --- time ---------------------------------------------------------------
   C_time:   25.0,          // Time compression. 1 s wall = 25 s simulated.
@@ -331,7 +352,6 @@ const DERIVED = Object.freeze({
   gap: PARAMS.L_pitch - PARAMS.L_body,                           // 1.5 m
   gap_duty: (PARAMS.L_pitch - PARAMS.L_body) / PARAMS.L_pitch,   // 8.82 %
   train_len: PARAMS.L_loco + PARAMS.N_cars * PARAMS.L_pitch,     // 361 m
-  decel: PARAMS.k_brake * PARAMS.g,                              // 1.1768 m/s^2
   t_fill_car: PARAMS.m_cap / PARAMS.mdot,                        // 144 s sim
   t_fill_all: PARAMS.N_cars * PARAMS.m_cap / PARAMS.mdot,        // 2880 s sim
 });
@@ -389,42 +409,50 @@ const physics = (() => {
   function speed(st) { return st.p / mass(st); }
 
   // --- forces --------------------------------------------------------------
-  // Traction, SPEC §2.4:  F = min( P_available / v , mu * m_driven * g )
+  // Traction, SPEC §2.4:  F = throttle * min( P_rated / v , mu * m_driven * g )
   //
-  // The adhesion cap is not optional. P/v diverges as v -> 0, so without it the
-  // train either launches off the line at t = 0 or produces a NaN. With
-  // mu = 0.30 the cap binds below v_cross = 6.798 m/s, which covers every
-  // launch and every low-speed shunt — i.e. all of normal play.
+  // The throttle commands a FRACTION of the available tractive effort, which is
+  // what a locomotive controller actually does: at low speed the notch sets
+  // tractive effort against a current limit, and only at higher speed does the
+  // power rating become the binding constraint. Adhesion caps the maximum
+  // either way.
   //
-  // Setting mu = Infinity (how Test 3 is run, SPEC §7.3) makes the cap
-  // unselectable and leaves F = P/v exactly. The code path is unchanged; only
-  // a parameter takes a limiting value.
+  // This was wrong until the control-fidelity pass. The throttle used to scale
+  // only the power term, so below v_cross the min() always selected the
+  // adhesion cap and 1 % throttle gave exactly the same 441 kN as 100 %. All
+  // low-speed control — which, starting 30 m from the chute, is the entire
+  // game — was effectively a single on/off notch.
+  //
+  // The adhesion cap is not optional: P/v diverges as v -> 0, so without it the
+  // train either launches off the line at t = 0 or produces a NaN. Setting
+  // mu = Infinity (how Test 3 is run, SPEC §7.3) makes the cap unselectable and
+  // leaves F = P/v exactly; the code path is unchanged, only a parameter takes
+  // a limiting value. Test 3 and check S3 both run at throttle = 1, so neither
+  // is affected by this correction.
   function traction(par, ctl, v) {
-    if (!(ctl.throttle > 0)) return 0;
+    const th = ctl.throttle;              // SIGNED: -1 full reverse .. +1 full forward
+    if (!th) return 0;
     const adh = par.mu * par.m_driven * par.g;
-    const vd = v * ctl.dir;               // speed in the direction being pulled
-    // Stalled, or still rolling the other way: the power limit does not apply,
-    // the motors are at full effort and adhesion is what holds it back.
-    if (!(vd > 0)) return ctl.dir * adh;
-    return ctl.dir * Math.min(ctl.throttle * par.P_rated / vd, adh);
+    const sp = Math.abs(v);
+    // Available effort is the same whether motoring or regenerating: the motors
+    // are rated the same in both directions, and adhesion caps both.
+    const avail = sp > 0 ? Math.min(par.P_rated / sp, adh) : adh;
+    return th * avail;
   }
 
-  // Brake, SPEC §2.5. A FORCE, never a constant power — a constant-power brake
-  // misbehaves at low speed for exactly the reason traction does.
+  // There is NO friction brake. Retardation is regenerative: the throttle is
+  // pushed to the opposite sign and the traction motors work as generators.
+  // Same machine, same rating, same adhesion cap, opposite direction — so it is
+  // all handled by traction() above and there is nothing separate here.
   //
-  //   F_brake = demand * min( k_b * M * g , mu * M * g )
+  // This still satisfies the brief's requirement that the brake be a FORCE and
+  // be adhesion-limited rather than an unbounded constant-power brake: the
+  // retarding force is min(P/|v|, mu*m_driven*g), which is capped at 441.30 kN
+  // and does not diverge as v -> 0.
   //
-  // All axles of loco and cars are braked, so the braked weight is the full
-  // instantaneous train weight including loaded grain. The deceleration k_b*g
-  // is therefore mass independent. With k_b = 0.12 and mu = 0.30 the design
-  // brake ratio binds and the adhesion branch is unreachable; the min() is
-  // implemented anyway because it is the structurally correct statement, and a
-  // wet-rail variant would make it bind (SPEC open point 4).
-  function braking(par, ctl, v, M) {
-    if (!(ctl.brake > 0) || v === 0) return 0;
-    const Fmax = ctl.brake * Math.min(par.k_brake, par.mu) * M * par.g;
-    return v > 0 ? -Fmax : Fmax;          // always opposes motion
-  }
+  // The consequence the player feels: retarding effort falls off as 1/v, so a
+  // loaded train takes M*v^3/(3P) to stop — 30 m from 1 m/s at 2710 t. With no
+  // friction brake to fall back on, creeping is not optional.
 
   // --- one substep ---------------------------------------------------------
   // Classical RK4 on (x, p). M is held at its substep-entry value: within a
@@ -438,8 +466,7 @@ const physics = (() => {
     const f = (x, p) => {
       const v = p / M;
       const Ft = traction(par, ctl, v);
-      const Fb = braking(par, ctl, v, M);
-      return { dx: v, dp: Ft + Fb, v, Ft, Fb };
+      return { dx: v, dp: Ft, v, Ft };
     };
     const k1 = f(st.x,                    st.p);
     const k2 = f(st.x + 0.5 * dt * k1.dx, st.p + 0.5 * dt * k1.dp);
@@ -507,25 +534,16 @@ const physics = (() => {
       const M = mass(st);
       const v = st.p / M;
       const par = st.par;
-      const Ft = traction(par, ctl, v), Fb = braking(par, ctl, v, M);
-      const F = Math.abs(Ft + Fb);
+      const F = Math.abs(traction(par, ctl, v));
       const cap = par.sub_tol * Math.max(Math.abs(v), par.sub_vref) * M;
       // dt such that |dp| stays under `cap`; unbounded when there is no force.
       let dt = F > 0 ? cap / F : Infinity;
       if (!(dt > 1e-13)) dt = 1e-13;          // guarantee forward progress
       if (dt > left) dt = left;
-      // Brakes bring a train to rest; they do not drive it backwards. The brake
-      // force is independent of v, so the stopping motion is exactly constant
-      // deceleration and the stop time is exact: land the substep on it rather
-      // than overshooting and clamping, which would leave the brake work
-      // integral disagreeing with the momentum actually removed.
-      if (Fb !== 0 && Ft === 0) {
-        const t_stop = -v * M / (Ft + Fb);
-        if (t_stop > 0 && t_stop < dt) dt = t_stop;
-      }
+      // No stop-at-zero special case: regenerative effort is continuous through
+      // v = 0 (the adhesion branch takes over as P/|v| diverges), and holding
+      // reverse throttle through zero correctly drives the train backwards.
       commit(st, ctl, rk4(st, ctl, dt));
-      // Snap off float dust so a braked train sits still instead of jittering.
-      if (Fb !== 0 && Math.abs(st.p) < 1e-6 * M) st.p = 0;
       left -= dt;
       subs++;
     }
@@ -675,7 +693,7 @@ const ledger = (() => {
       // energy, J
       KE_0: ke0 || 0,       // total kinetic energy when the ledger was armed
       W_traction: 0,        // + integral F_traction . v dt
-      W_brake: 0,           // + integral |F_brake . v| dt, energy REMOVED
+      W_regen: 0,           // + integral |F_brake . v| dt, energy REMOVED
       E_diss: 0,            // + integral 0.5 v^2 (dM/dt) dt
       J_acc: 0,             // + integral v (dM/dt) dt, N s — Test 4 cross-check
       n: 0,
@@ -707,13 +725,19 @@ const ledger = (() => {
     const k = s.stages, dt = s.dt;
     const simp = (a, m1, m2, b) => dt * (a + 2 * m1 + 2 * m2 + b) / 6;
 
-    L.W_traction += simp(k[0].Ft * k[0].v, k[1].Ft * k[1].v,
-                         k[2].Ft * k[2].v, k[3].Ft * k[3].v);
-    // F_brake always opposes v, so Fb.v is negative and this is the positive
-    // energy the brakes removed. Reported as the integral of F_brake . v, never
-    // as a power figure (SPEC §2.5).
-    L.W_brake    -= simp(k[0].Fb * k[0].v, k[1].Fb * k[1].v,
-                         k[2].Fb * k[2].v, k[3].Fb * k[3].v);
+    // With one bipolar control there is a single signed mechanical work
+    // integral, and it is split by SIGN for reporting: where F.v > 0 the motors
+    // are driving, where F.v < 0 they are generating and returning energy.
+    //
+    // The split is exact, not approximate. max(a,0) + min(a,0) = a identically,
+    // and Simpson's rule is linear, so W_traction - W_regen is exactly the
+    // Simpson integral of F.v. The brief's Test 2 form is therefore preserved
+    // verbatim, with W_regen playing the role of its W_brakes.
+    const pos = x => x > 0 ? x : 0, neg = x => x < 0 ? x : 0;
+    const fv0 = k[0].Ft * k[0].v, fv1 = k[1].Ft * k[1].v,
+          fv2 = k[2].Ft * k[2].v, fv3 = k[3].Ft * k[3].v;
+    L.W_traction += simp(pos(fv0), pos(fv1), pos(fv2), pos(fv3));
+    L.W_regen    -= simp(neg(fv0), neg(fv1), neg(fv2), neg(fv3));
 
     // Dissipation. Derived in SPEC §2.7 ROUTE 2, the perfectly inelastic
     // collision, and written from that argument alone:
@@ -744,7 +768,7 @@ const ledger = (() => {
   }
 
   // Test 1 (SPEC §7.1):  m_released == m_cars + m_ground
-  // Test 2 (SPEC §7.2):  W_traction - W_brake == dKE_total + E_diss
+  // Test 2 (SPEC §7.2):  W_traction - W_regen == dKE_total + E_diss
   //
   // `kin` carries the CURRENT total kinetic energy. Both identities are checked
   // here, never assumed.
@@ -758,13 +782,13 @@ const ledger = (() => {
 
     const KE = kin === undefined ? 0 : kin;
     const dKE = KE - L.KE_0;
-    const lhs_e = L.W_traction - L.W_brake;
+    const lhs_e = L.W_traction - L.W_regen;   // = the signed integral of F.v
     const rhs_e = dKE + L.E_diss;
     const resid_e = lhs_e - rhs_e;
     // Normalise by the largest term present, so the measure stays meaningful
     // when traction and brake are both zero (Test 4's coasting case, where the
     // left side is exactly zero and dKE balances E_diss on the right).
-    const scale = Math.max(Math.abs(L.W_traction), Math.abs(L.W_brake),
+    const scale = Math.max(Math.abs(L.W_traction), Math.abs(L.W_regen),
                            Math.abs(dKE), Math.abs(L.E_diss));
 
     return {
@@ -779,7 +803,7 @@ const ledger = (() => {
       loss_fraction: L.m_released > 0 ? L.m_ground / L.m_released : 0,
       // --- Test 2 ---
       W_traction: L.W_traction,
-      W_brake: L.W_brake,
+      W_regen: L.W_regen,
       KE_0: L.KE_0, KE: KE, dKE,
       E_diss: L.E_diss,
       energy_lhs: lhs_e, energy_rhs: rhs_e,
@@ -838,9 +862,15 @@ const rules = (() => {
   // Distance needed to stop from speed v at full brake. Used for the trip stop
   // that keeps the train on the track without inventing a crash state: the
   // brake is applied through the normal control path, so the energy it removes
-  // lands in W_brake like any other braking and the ledger still closes.
-  function stopDistance(par, v) {
-    return (v * v) / (2 * Math.min(par.k_brake, par.mu) * par.g);
+  // lands in W_regen like any other retardation and the ledger still closes.
+  // Distance to stop from speed v at full regenerative effort. Kinetic energy
+  // is removed at constant power P, so v^2 falls linearly and
+  //   s = integral v dt = M |v|^3 / (3 P).
+  // Below v_cross adhesion gives MORE force than P/|v|, so this overestimates
+  // and is safe to trip on. It is strongly mass dependent, unlike the friction
+  // brake it replaced: 30 m from 1 m/s at 2710 t, against 7.9 m at 710 t.
+  function stopDistance(par, v, M) {
+    return M * Math.abs(v) ** 3 / (3 * par.P_rated);
   }
 
   return { verdict, grade, stopDistance, BANDS };
@@ -887,28 +917,28 @@ const tests = (() => {
   function sequence(p) {
     return [
       { label: 'stationary, chute open 900 m short — ahead-of-train loss at rest',
-        x: -900, v: 0, throttle: 0, brake: 0, chute: true, dir: 1, t: 20 },
+        x: -900, v: 0, throttle: 0, chute: true, t: 20 },
       { label: 'accelerate, chute shut',
-        throttle: 1, brake: 0, chute: false, t: 25 },
+        throttle: 1, chute: false, t: 25 },
       { label: 'coast at speed, chute open, still short — HEAVY SPILL AT SPEED',
-        throttle: 0, brake: 0, chute: true, t: 28 },
-      { label: 'brake to rest, chute shut',
-        throttle: 0, brake: 1, chute: false, t: 30 },
+        throttle: 0, chute: true, t: 28 },
+      { label: 'regenerate to rest, chute shut',
+        throttle: -1, chute: false, t: 30 },
       { label: 'chute over the locomotive — loco roof loss',
-        x: p.x_chute + p.L_loco / 2, throttle: 0, brake: 0, chute: true, t: 10 },
+        x: p.x_chute + p.L_loco / 2, throttle: 0, chute: true, t: 10 },
       { label: 'chute on car 1 centre — fills to capacity then overflows',
-        x: noseFor(p, 0, p.L_body / 2), throttle: 0, brake: 0, chute: true, t: 160 },
+        x: noseFor(p, 0, p.L_body / 2), throttle: 0, chute: true, t: 160 },
       { label: 'crawl forward, chute open — coupling-gap loss + accretion drag',
-        throttle: 0.15, brake: 0, chute: true, t: 60 },
-      { label: 'brake while still loading — brake work with accretion',
-        throttle: 0, brake: 1, chute: true, t: 30 },
+        throttle: 0.15, chute: true, t: 60 },
+      { label: 'regenerate while still loading — recovery with accretion',
+        throttle: -1, chute: true, t: 30 },
       { label: 'chute open past the last car — past-the-train loss',
         x: p.x_chute + p.L_loco + p.N_cars * p.L_pitch + 140,
-        throttle: 0, brake: 0, chute: true, t: 30 },
+        throttle: 0, chute: true, t: 30 },
       { label: 'accelerate, chute shut — work integrals, no accretion',
-        throttle: 1, brake: 0, chute: false, t: 20 },
-      { label: 'brake to rest, chute shut',
-        throttle: 0, brake: 1, chute: false, t: 30 },
+        throttle: 1, chute: false, t: 20 },
+      { label: 'regenerate to rest, chute shut',
+        throttle: -1, chute: false, t: 30 },
     ];
   }
 
@@ -973,7 +1003,7 @@ const tests = (() => {
     const L = LTT.runScript(sequence(LTT.effective()));
     return result('2', 'Energy ledger — W_tr − W_br = ΔKE + ½∫v²dM', [
       info('W_traction',                 L.W_traction, 'J'),
-      info('W_brake',                    L.W_brake,    'J'),
+      info('W_regen (recovered)',        L.W_regen,    'J'),
       info('left side   W_tr − W_br',    L.energy_lhs, 'J'),
       info('ΔKE_total  (full instantaneous M)', L.dKE, 'J'),
       info('E_diss = ½∫v²(dM/dt)dt',     L.E_diss,     'J'),
@@ -1005,7 +1035,7 @@ const tests = (() => {
     const M = p.m_loco + p.N_cars * p.m_tare;
     const P_ = p.P_rated, t = o.t, v0 = o.v0;
 
-    LTT.setState({ throttle: 1, brake: 0, chute: false, dir: 1, v: v0 });
+    LTT.setState({ throttle: 1, chute: false, v: v0 });
     LTT.arm();
     const x0 = LTT.state().x;
     LTT.step(t);
@@ -1097,7 +1127,7 @@ const tests = (() => {
       // at the rear edge instead leaves only 0.9 m and the grain falls out the
       // back, which is exactly what the first version of this test did.
       LTT.setState({ x: noseFor(p, 0, 0.5 * p.w_chute),
-                     v: v0, throttle: 0, brake: 0, chute: true, dir: 1 });
+                     v: v0, throttle: 0, chute: true });
       LTT.arm();
       const M0 = LTT.state().M, pmom = LTT.state().p, KE0 = 0.5 * M0 * v0 * v0;
       LTT.step(t);
@@ -1154,7 +1184,7 @@ const tests = (() => {
     const Fa = p.mu * p.m_driven * p.g;
     const a = Fa / M, vc = p.P_rated / Fa, tc = vc / a, sc = 0.5 * a * tc * tc;
 
-    LTT.setState({ throttle: 1, brake: 0, chute: false, dir: 1, v: 0 });
+    LTT.setState({ throttle: 1, chute: false, v: 0 });
     LTT.arm();
     const x0 = LTT.state().x;
     LTT.step(o.t);
@@ -1195,7 +1225,7 @@ const tests = (() => {
 
   // ========================= DETERMINISM ================================
   function checkDet() {
-    const keys = ['m_released', 'm_cars', 'm_ground', 'W_traction', 'W_brake',
+    const keys = ['m_released', 'm_cars', 'm_ground', 'W_traction', 'W_regen',
                   'E_diss', 'dKE', 'J_acc'];
     LTT.reset(); const A = LTT.runScript(sequence(LTT.effective()));
     LTT.reset(); const B = LTT.runScript(sequence(LTT.effective()));
@@ -1226,7 +1256,10 @@ const tests = (() => {
 // ===========================================================================
 //  LTT — the console API of SPEC.md §7.5. Grows task by task.
 // ===========================================================================
-const CTL_NEUTRAL = { throttle: 0, brake: 0, dir: 1, chute: false };
+// One bipolar control. `throttle` is signed: +1 full forward tractive effort,
+// -1 full reverse. There is no brake and no reverser — pushing the throttle
+// negative while rolling forward IS the brake, regeneratively.
+const CTL_NEUTRAL = { throttle: 0, chute: false };
 
 let _st = physics.create();
 let _ctl = Object.assign({}, CTL_NEUTRAL);
@@ -1281,7 +1314,7 @@ const LTT = {
   // the input layer, so they are exactly reproducible (SPEC §4.2).
   setState(s) {
     s = s || {};
-    for (const k of ['throttle', 'brake', 'dir', 'chute']) {
+    for (const k of ['throttle', 'chute']) {
       if (k in s) _ctl[k] = s[k];
     }
     if ('x' in s) _st.x = s.x;
@@ -1477,7 +1510,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
       'against your own arithmetic:<br>' +
       '<code>LTT.runTest(3, {P: 2e6, M: 5e5, t: 30})</code> &nbsp; ' +
       '<code>LTT.runTest(3, {mu: Infinity})</code><br>' +
-      '<code>LTT.setState({throttle, brake, chute, dir, v, x, fill})</code> &nbsp; ' +
+      '<code>LTT.setState({throttle, chute, v, x, fill})</code> &nbsp; ' +
       '<code>LTT.step(dt_sim)</code> &nbsp; <code>LTT.arm()</code><br>' +
       '<code>LTT.ledger()</code> &nbsp; <code>LTT.state()</code> &nbsp; ' +
       '<code>LTT.params()</code> &nbsp; <code>LTT.derived()</code> &nbsp; ' +
@@ -1514,7 +1547,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
   // =========================================================================
   //  GAME
   // =========================================================================
-  const P = LTT.params(), D = LTT.derived();
+  const P = LTT.params(), DER = LTT.derived();
   const G = LTT.geom;
   const GAP = P.L_pitch - P.L_body;
 
@@ -1535,8 +1568,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     practice: false,
     started: false,       // clock starts on the first real input
     tWall: 0,
-    slider: 0,            // -1 full brake .. 0 neutral .. +1 full power
-    dir: 1,
+    slider: 0,            // -1 full reverse .. 0 coast .. +1 full forward
     chute: false,
     tripped: false,
     drawer: false,
@@ -1547,12 +1579,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
 
   function newRun(practice) {
     LTT.reset();
-    LTT.setState({ throttle: 0, brake: 0, dir: 1, chute: false });
+    LTT.setState({ throttle: 0, chute: false });
     LTT.arm();
     st = LTT.stateRef();
     ctl = LTT.ctlRef();
     S.practice = !!practice;
-    S.started = false; S.tWall = 0; S.slider = 0; S.dir = 1;
+    S.started = false; S.tWall = 0; S.slider = 0;
     S.chute = false; S.tripped = false; S.verdict = null;
     S.drawer = !!practice;
     camX = st.x + 12;
@@ -1573,6 +1605,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
 
   // --- canvas --------------------------------------------------------------
   let cv, ctx, W = 0, H = 0, dpr = 1, camX = 0;
+  let mapc = null, mapx = null, MW = 0, MH = 0;
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const r = cv.getBoundingClientRect();
@@ -1580,6 +1613,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     H = Math.max(1, Math.round(r.height));
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (mapc) {
+      const q = mapc.getBoundingClientRect();
+      MW = Math.max(1, Math.round(q.width)); MH = Math.max(1, Math.round(q.height));
+      mapc.width = Math.round(MW * dpr); mapc.height = Math.round(MH * dpr);
+      mapx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }
 
   const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
@@ -1845,6 +1884,68 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     }
   }
 
+  // ------------------------------------------------------------- overview map
+  // The play view is 26 m wide; the train is 361 m long and the yard is longer
+  // still. This is the "where am I" view: whole train, whole yard, every car
+  // shaded by how full it is, and a bracket showing what the play view covers.
+  function drawMap() {
+    if (!mapx) return;
+    // The train trails 361 m behind the nose, so at the start its rear is at
+    // x_start - 361. Cover that through to the nose position that puts car 20
+    // under the chute, with a little air at each end.
+    const X0 = P.x_start - DER.train_len - 15;
+    const X1 = P.L_loco + (P.L_pitch - P.L_body) + (P.N_cars - 1) * P.L_pitch + 30;
+    const mx = x => (x - X0) / (X1 - X0) * MW;
+    mapx.clearRect(0, 0, MW, MH);
+    const midY = Math.round(MH * 0.58);
+
+    // yard: rail line, with the ends of the usable track marked
+    mapx.strokeStyle = '#4A362A'; mapx.lineWidth = 2;
+    mapx.beginPath(); mapx.moveTo(mx(P.x_min), midY); mapx.lineTo(mx(P.x_max), midY);
+    mapx.stroke();
+    mapx.fillStyle = '#6B5238';
+    for (const lim of [P.x_min, P.x_max]) mapx.fillRect(mx(lim) - 1, midY - 5, 2, 10);
+
+    // the train: one segment per car, shaded by fill, plus the loco
+    const h = 11, top = midY - h / 2;
+    const under = G.underChute(P, st.x);
+    for (let k = 0; k < P.N_cars; k++) {
+      const F = G.troughFront(P, st.x, k), R = F - P.L_body;
+      const x0 = mx(R), w = Math.max(1.5, mx(F) - x0);
+      const f = clamp(st.fill[k] / P.m_cap, 0, 1);
+      mapx.fillStyle = '#4A362A';
+      mapx.fillRect(x0, top, w, h);
+      if (f > 0) {
+        mapx.fillStyle = f >= P.fill_target ? '#6FCB80' : '#E8B54A';
+        mapx.fillRect(x0, top + h * (1 - f), w, h * f);
+      }
+      if (under.kind === 'car' && under.index === k) {
+        mapx.strokeStyle = '#F6EFE3'; mapx.lineWidth = 1.5;
+        mapx.strokeRect(x0 - 0.75, top - 1.5, w + 1.5, h + 3);
+      }
+    }
+    const lx0 = mx(st.x - P.L_loco), lw = Math.max(2, mx(st.x) - lx0);
+    mapx.fillStyle = '#C4483A'; mapx.fillRect(lx0, top - 1, lw, h + 2);
+
+    // the chute, and what the play view is showing
+    const cxp = mx(P.x_chute);
+    mapx.fillStyle = '#F6EFE3';
+    mapx.fillRect(cxp - 1, 1, 2, MH - 2);
+    mapx.beginPath(); mapx.moveTo(cxp - 4, 1); mapx.lineTo(cxp + 4, 1);
+    mapx.lineTo(cxp, 7); mapx.closePath(); mapx.fill();
+
+    const scale = clamp(W / 26, 12, 34);
+    const halfView = (W / scale) / 2;
+    mapx.strokeStyle = '#F6EFE399'; mapx.lineWidth = 1;
+    mapx.strokeRect(mx(camX - halfView), 1.5, mx(camX + halfView) - mx(camX - halfView), MH - 3);
+
+    // distance from the chute to the nearest car edge, in plain metres
+    mapx.fillStyle = '#7A6249';
+    mapx.font = '9px ui-monospace, Menlo, Consolas, monospace';
+    mapx.textAlign = 'right'; mapx.textBaseline = 'top';
+    mapx.fillText(Math.round(st.x) + ' m', MW - 4, 1);
+  }
+
   // ------------------------------------------------------------------ HUD
   let el = {};
   function buildGame() {
@@ -1864,6 +1965,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     }
     g.appendChild(strip);
 
+    const main = document.createElement('div'); main.className = 'main';
     const stage = document.createElement('div'); stage.className = 'stage';
     cv = document.createElement('canvas'); ctx = cv.getContext('2d');
     stage.appendChild(cv);
@@ -1872,7 +1974,8 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     hud.innerHTML =
       '<div class="line1"><b id="hv">0.00</b><span class="cap">m/s</span>' +
       '<b id="ht">0:00.0</b><span class="cap" id="hts">sim 0:00</span>' +
-      '<b id="hm">710</b><span class="cap">t</span></div>' +
+      '<b id="hm">710</b><span class="cap">t</span>' +
+      '<b id="hthr">0</b><span class="cap" id="hthrl">notch</span></div>' +
       '<div class="meter" id="mloss"><span class="lab">loss</span>' +
       '<span class="track"><span class="fillbar" id="blos"></span></span>' +
       '<span class="val" id="vlos">0.000 % / 1 %</span></div>' +
@@ -1892,29 +1995,41 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
       '<button class="btn ledg" id="bledg" title="physics ledger">∑</button>' +
       '<button class="btn pause" id="bpause">PAUSE</button>' +
       '<button class="btn done" id="bdone">DONE</button>' +
-      '<button class="btn rev" id="brev">FORWARD</button>' +
       '<button class="btn chute" id="bchute">CHUTE</button>' +
       '<div class="slider" id="sl">' +
         '<div class="zone zpow"></div><div class="zone zbrk"></div>' +
-        '<div class="zlab" style="top:6px">POWER</div>' +
-        '<div class="zlab" style="bottom:6px">BRAKE</div>' +
+        '<div class="zlab" style="top:6px">FWD</div>' +
+        '<div class="zlab" style="bottom:6px">REV</div>' +
         '<div class="mid"></div><div class="knob" id="knob"></div></div>';
     stage.appendChild(ctrls);
 
     const drawer = document.createElement('div'); drawer.className = 'drawer';
     drawer.id = 'drawer'; drawer.hidden = true; stage.appendChild(drawer);
 
-    g.appendChild(stage);
+    main.appendChild(stage);
+
+    // Overview map: the whole 361 m train against the whole yard, so the
+    // close play view never has to answer "where am I?".
+    const mapwrap = document.createElement('div'); mapwrap.className = 'map';
+    mapc = document.createElement('canvas'); mapx = mapc.getContext('2d');
+    mapwrap.appendChild(mapc);
+    const ml = document.createElement('div'); ml.className = 'maplab';
+    ml.textContent = 'YARD'; mapwrap.appendChild(ml);
+    main.appendChild(mapwrap);
+
+    g.appendChild(main);
     app.appendChild(g);
 
     el.hv = document.getElementById('hv'); el.ht = document.getElementById('ht');
     el.hts = document.getElementById('hts'); el.hm = document.getElementById('hm');
+    el.hthr = document.getElementById('hthr'); el.hthrl = document.getElementById('hthrl');
     el.blos = document.getElementById('blos'); el.vlos = document.getElementById('vlos');
     el.bacc = document.getElementById('bacc'); el.vacc = document.getElementById('vacc');
     el.mloss = document.getElementById('mloss');
     el.cap = document.getElementById('cap'); el.warn = document.getElementById('warn');
+    el.hud = hud;
     el.knob = document.getElementById('knob'); el.sl = document.getElementById('sl');
-    el.bchute = document.getElementById('bchute'); el.brev = document.getElementById('brev');
+    el.bchute = document.getElementById('bchute');
     el.bdone = document.getElementById('bdone'); el.bpause = document.getElementById('bpause');
     el.drawer = drawer; el.bledg = document.getElementById('bledg');
 
@@ -1933,6 +2048,9 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     el.ht.textContent = mmss(S.tWall);
     el.hts.textContent = 'sim ' + mmssS(st.t);
     el.hm.textContent = (M / 1000).toFixed(1);
+    el.hthr.textContent = Math.round(Math.abs(S.slider) * 100);
+    el.hthrl.textContent = S.slider > 0 ? '% fwd'
+      : (S.slider < 0 ? (v > 0.02 ? '% regen' : '% rev') : 'coast');
 
     const lossFrac = L.m_released > 0 ? L.m_ground / L.m_released : 0;
     el.blos.style.width = clamp(lossFrac / P.loss_budget, 0, 1) * 100 + '%';
@@ -1946,6 +2064,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     el.bacc.style.width = clamp(drag / 3000, 0, 1) * 100 + '%';
     el.vacc.textContent = drag < 1 ? '0 kN' : (drag / 1000).toFixed(2) + ' kN';
 
+    // Sit the caption under the HUD by measurement, not by a guessed constant:
+    // the HUD wraps to two lines at phone width and to one on a wide screen.
+    const hudH = el.hud.offsetHeight;
+    el.cap.style.top = (hudH + 3) + 'px';
+    el.warn.style.top = (hudH + 31) + 'px';
+
     const u = G.underChute(P, st.x);
     el.cap.textContent =
       u.kind === 'car'  ? 'CAR ' + (u.index + 1) + '  ·  ' +
@@ -1958,9 +2082,6 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
 
     el.warn.hidden = !S.tripped;
     el.bchute.classList.toggle('on', S.chute);
-    el.brev.classList.toggle('on', S.dir < 0);
-    el.brev.textContent = S.dir < 0 ? 'REVERSE' : 'FORWARD';
-    el.brev.disabled = Math.abs(v) >= 0.2;
 
     for (let i = 0; i < P.N_cars; i++) {
       const f = clamp(st.fill[i] / P.m_cap, 0, 1);
@@ -1984,7 +2105,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         row('on the ground', t(L.m_ground)) +
         '<tr class="sep"><td>Test 1 closure</td><td>' +
           L.mass_closure.toExponential(2) + '</td></tr>' +
-        row('W_traction', MJ(L.W_traction)) + row('W_brake', MJ(L.W_brake)) +
+        row('W_traction', MJ(L.W_traction)) + row('W_regen', MJ(L.W_regen)) +
         row('ΔKE_total', MJ(L.dKE)) + row('E_diss = ½∫v²dM', MJ(L.E_diss)) +
         '<tr class="sep"><td>Test 2 closure</td><td>' +
           L.energy_closure.toExponential(2) + '</td></tr>' +
@@ -1994,9 +2115,15 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
 
   // ---------------------------------------------------------------- input
   function setSlider(v) {
-    S.slider = clamp(v, -1, 1);
+    v = clamp(v, -1, 1);
+    // Neutral detent. Coasting is a real tactic — the train never slows on its
+    // own — so hitting exactly zero has to be reliable rather than lucky.
+    if (Math.abs(v) < 0.025) v = 0;
+    S.slider = v;
     const h = el.sl.clientHeight, k = 42;
     el.knob.style.top = ((0.5 - S.slider * 0.5) * (h - k) + k / 2) + 'px';
+    el.knob.textContent = S.slider === 0 ? '0'
+      : (S.slider > 0 ? '+' : '−') + Math.round(Math.abs(S.slider) * 100);
     if (S.slider !== 0) S.started = true;
   }
   function wireInput() {
@@ -2017,7 +2144,6 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     window.addEventListener('pointercancel', up);
 
     el.bchute.onclick = () => { S.chute = !S.chute; S.started = true; };
-    el.brev.onclick = () => { if (Math.abs(LTT.speed()) < 0.2) S.dir = -S.dir; };
     el.bdone.onclick = () => finish();
     el.bpause.onclick = () => togglePause();
     el.bledg.onclick = () => { S.drawer = !S.drawer; };
@@ -2025,13 +2151,15 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     window.addEventListener('keydown', e => {
       if (S.mode !== 'run' && S.mode !== 'paused') return;
       const k = e.key;
-      if (k === 'ArrowUp')   { setSlider(S.slider + 0.05); e.preventDefault(); }
-      else if (k === 'ArrowDown') { setSlider(S.slider - 0.05); e.preventDefault(); }
+      // + / - are the fine control, arrows the coarse one.
+      if (k === '+' || k === '=') { setSlider(S.slider + 0.02); e.preventDefault(); }
+      else if (k === '-' || k === '_') { setSlider(S.slider - 0.02); e.preventDefault(); }
+      else if (k === 'ArrowUp')   { setSlider(S.slider + 0.10); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSlider(S.slider - 0.10); e.preventDefault(); }
       else if (k === '0')    setSlider(0);
       else if (k === 'Home') setSlider(1);
       else if (k === 'End')  setSlider(-1);
       else if (k === ' ')    { S.chute = !S.chute; S.started = true; e.preventDefault(); }
-      else if (k === 'r' || k === 'R') { if (Math.abs(LTT.speed()) < 0.2) S.dir = -S.dir; }
       else if (k === 'p' || k === 'P') togglePause();
       else if (k === 'd' || k === 'D') finish();
     });
@@ -2058,20 +2186,23 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
       if (S.mode === 'run') {
         // Effective controls: player input, with the trip stop able to override.
         // The trip stop is a normal brake application through the normal path,
-        // so the energy it removes lands in W_brake and the ledger still closes.
+        // so the energy it removes lands in W_regen and the ledger still closes.
         // No crash state, per SPEC decision 11.
-        let thr = Math.max(0, S.slider), brk = Math.max(0, -S.slider);
-        const v = LTT.speed(), d = rules.stopDistance(P, v) + 6;
+        let thr = S.slider;
+        const v = LTT.speed(), d = rules.stopDistance(P, v, LTT.mass()) + 6;
         S.tripped = false;
         if ((v > 0 && st.x + d > P.x_max) || (v < 0 && st.x - d < P.x_min)) {
-          thr = 0; brk = 1; S.tripped = true;
+          thr = v > 0 ? -1 : 1; S.tripped = true;    // full regenerative effort
         }
-        ctl.throttle = thr; ctl.brake = brk; ctl.dir = S.dir; ctl.chute = S.chute;
+        ctl.throttle = thr; ctl.chute = S.chute;
 
         if (S.started) S.tWall += dtWall;
         LTT.step(dtWall * P.C_time);
       }
-      if (cv) { updateSparks(S.mode === 'run' ? dtWall : 0, 1); draw(dtWall); updateHUD(); }
+      if (cv) {
+        updateSparks(S.mode === 'run' ? dtWall : 0, 1);
+        draw(dtWall); drawMap(); updateHUD();
+      }
     }
     schedule();
   }
@@ -2142,8 +2273,10 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'immediately: <b>the train never slows down on its own.</b> Every stop ' +
         'has to be braked.</p>' +
         '<p>Time runs at <b>25×</b>. One second on the clock is twenty-five ' +
-        'seconds for the train. Every other quantity — the 150 t locomotive, its ' +
-        '3 MW, the 100 t cars, the 2500 t/h chute — is a real figure, unmodified.</p>' },
+        'seconds for the train. The 150 t locomotive, the 100 t cars and the ' +
+        '2500 t/h chute are all real figures. The locomotive is rated at ' +
+        '<b>0.3 MW</b>, which is deliberately about ten times weaker than a real ' +
+        'road freight unit — a yard shunter, not a line-haul engine.</p>' },
     { h: 'The physics — loading costs you speed', draft: true,
       html:
         '<p>Grain leaves the chute with <b>no forward speed</b>. When it lands in ' +
@@ -2153,19 +2286,30 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         '<p>Watch the <b>drag</b> bar while you load on the move. This is not a ' +
         'penalty someone typed in — it falls out of the equation of motion, and ' +
         'you can audit it live with the <b>∑</b> button.</p>' +
-        '<p>Momentum is conserved <b>only while coasting</b>, with no power and no ' +
-        'brake. Under either one the rails push on the train and it is not.</p>' },
+        '<p>Momentum is conserved <b>only while coasting</b>, with the throttle ' +
+        'at zero. Under tractive effort in either direction the rails push on ' +
+        'the train and it is not.</p>' +
+        '<p>Because retardation is regenerative and the motors are ' +
+        'power-limited, the force you can brake with falls off as <code>1/v</code>. ' +
+        'A loaded train needs about 30 m to stop from 1 m/s. Creeping is not ' +
+        'optional.</p>' },
     { h: 'Controls', draft: false,
       html:
-        '<p>The chute is fixed. You move the train under it.</p>' +
-        '<ul><li><b>Slider</b> — power at the top, brake at the bottom. It stays ' +
-        'where you leave it.</li>' +
+        '<p>The chute is fixed. You move the train under it. You start 30 m ' +
+        'short of it, so this is all low-speed shunting — small notches.</p>' +
+        '<ul><li><b>Slider</b> — one control, both directions. Up drives ' +
+        'forward, down drives backward. It stays where you leave it and snaps ' +
+        'to zero near the middle so you can coast cleanly.</li>' +
+        '<li><b>There is no brake.</b> To slow down, push the throttle to the ' +
+        'opposite sign: the motors become generators and give the energy back. ' +
+        'Same rating, same adhesion limit, opposite direction. Hold it through ' +
+        'zero and you will start moving the other way.</li>' +
         '<li><b>CHUTE</b> — opens and shuts the grain.</li>' +
-        '<li><b>FORWARD / REVERSE</b> — only below 0.2 m/s. You may shunt back ' +
-        'and top up a car; the clock keeps running.</li>' +
         '<li><b>DONE</b> — ends the run and scores it.</li></ul>' +
-        '<p class="keys">Keyboard: ↑ ↓ slider · 0 neutral · Home/End full · ' +
-        'SPACE chute · R reverse · P pause · D done</p>' +
+        '<p class="keys"><b>+ / −</b> power in 2 % steps (fine) · ' +
+        '<b>↑ ↓</b> in 10 % steps · <b>0</b> coast · ' +
+        '<b>Home/End</b> full forward / full reverse<br>' +
+        '<b>SPACE</b> chute · <b>P</b> pause · <b>D</b> done</p>' +
         '<p>Grain lands where the chute is. If a coupling gap — or the ' +
         'locomotive, or nothing at all — is underneath, that grain is on the ground.</p>' },
   ];
@@ -2260,7 +2404,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         '<tr><td>closure</td><td>' + L.mass_closure.toExponential(2) + '</td></tr></table>' +
         '<h3>Energy ledger — Test 2</h3><table class="rpt">' +
         '<tr><td>W_traction</td><td>' + MJ(L.W_traction) + '</td></tr>' +
-        '<tr><td>W_brake</td><td>' + MJ(L.W_brake) + '</td></tr>' +
+        '<tr><td>W_regen (recovered)</td><td>' + MJ(L.W_regen) + '</td></tr>' +
         '<tr><td>ΔKE_total</td><td>' + MJ(L.dKE) + '</td></tr>' +
         '<tr><td>E_diss = ½∫v²dM</td><td>' + MJ(L.E_diss) + '</td></tr>' +
         '<tr><td>closure</td><td>' + L.energy_closure.toExponential(2) + '</td></tr></table>';
