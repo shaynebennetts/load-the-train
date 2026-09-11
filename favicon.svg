@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img"
+     aria-label="Load the train — grain pouring from a chute into a hopper car">
+  <!-- Palette taken from the game itself: warm storybook, dark outlines. -->
+  <rect width="64" height="64" rx="13" fill="#2E2118"/>
+  <!-- chute -->
+  <path d="M22 3h20v13l-5.5 6h-9L22 16z" fill="#8A6A4F" stroke="#3B2A1E" stroke-width="2.6"
+        stroke-linejoin="round"/>
+  <!-- grain stream, falling into the trough -->
+  <path d="M28.5 23h7v14h-7z" fill="#F0C558"/>
+  <circle cx="32" cy="27" r="3.6" fill="#F7D77A"/>
+  <circle cx="32" cy="34" r="3.1" fill="#E8B54A"/>
+  <!-- hopper car, part filled -->
+  <rect x="5" y="35" width="54" height="16" rx="3.4" fill="#6B4F3A"
+        stroke="#3B2A1E" stroke-width="2.8"/>
+  <path d="M7.8 42h48.4v6.6a1.8 1.8 0 0 1-1.8 1.8H9.6a1.8 1.8 0 0 1-1.8-1.8z" fill="#F0C558"/>
+  <!-- wheels, clear of the edge -->
+  <circle cx="19" cy="55" r="5" fill="#3B2A1E"/>
+  <circle cx="45" cy="55" r="5" fill="#3B2A1E"/>
+  <circle cx="19" cy="55" r="1.9" fill="#8A6A4F"/>
+  <circle cx="45" cy="55" r="1.9" fill="#8A6A4F"/>
+</svg>

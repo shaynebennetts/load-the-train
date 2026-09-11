@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load the train</title>
+<meta name="description" content="A physics game where the cargo you load is the thing slowing you down. Project 1, Basic Skills for Experimentalists, TIGP 2026.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  :root{
+    --ink:#2E2118; --paper:#F6EFE3; --grain:#F0C558;
+    --wood:#6B4F3A; --barn:#C4553D; --dim:#C9B79E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--paper);
+       font:16px/1.65 ui-sans-serif,system-ui,"Segoe UI",Inter,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:940px;margin:0 auto;padding-inline:20px}
+  a{color:var(--grain)}
+  h1,h2,h3{line-height:1.2;margin:0 0 .5em}
+  h1{font-size:clamp(2.1rem,6vw,3.4rem);letter-spacing:-.02em}
+  h2{font-size:clamp(1.4rem,3.4vw,2rem);margin-top:0}
+  section{padding-block:clamp(2.4rem,6vw,4rem);border-top:1px solid #ffffff14}
+
+  .hero{padding-block:clamp(2.5rem,7vw,4.5rem)}
+  .heroTop{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+  .heroTop img{width:84px;height:84px;border-radius:18px;flex:none}
+  .tag{color:var(--dim);font-size:.92rem;letter-spacing:.04em;text-transform:uppercase;
+       margin:0 0 .35em}
+  .lede{font-size:clamp(1.05rem,2.2vw,1.3rem);color:#EDE0CC;max-width:62ch;margin:1.1em 0 0}
+  .btns{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.6rem}
+  .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:11px;text-decoration:none;
+       font-weight:650;border:2px solid #ffffff22;color:var(--paper);background:#ffffff10}
+  .btn.primary{background:var(--barn);border-color:#00000030;color:#fff}
+  .btn:hover{border-color:var(--grain)}
+
+  figure{margin:0 0 1.4rem}
+  figure img{width:100%;height:auto;display:block;border-radius:14px;
+             border:2px solid #ffffff1f;background:#000}
+  figcaption{color:var(--dim);font-size:.9rem;margin-top:.6rem}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:1.6rem}
+  @media (max-width:720px){.cols{grid-template-columns:1fr}}
+
+  .facts{list-style:none;padding:0;margin:0;display:grid;
+         grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+  .facts li{background:#ffffff0d;border:1px solid #ffffff14;border-radius:12px;padding:.85rem 1rem}
+  .facts b{display:block;font-size:1.45rem;color:var(--grain);line-height:1.15}
+  .facts span{color:var(--dim);font-size:.86rem}
+
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.94rem}
+  th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid #ffffff14}
+  th{color:var(--dim);font-weight:600;white-space:nowrap}
+  td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+  code{background:#ffffff12;padding:.12em .4em;border-radius:5px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+  .eq{background:#ffffff0d;border-left:3px solid var(--grain);border-radius:0 10px 10px 0;
+      padding:.9rem 1.1rem;margin:1.1rem 0;overflow-x:auto}
+  .eq code{background:none;padding:0;font-size:1rem}
+  .note{color:var(--dim)}
+  footer{padding-block:2.5rem;color:var(--dim);font-size:.9rem;border-top:1px solid #ffffff14}
+</style>
+</head>
+<body>
+
+<header class="hero wrap">
+  <div class="heroTop">
+    <img src="favicon.svg" alt="">
+    <div>
+      <p class="tag">Project 1 &middot; Basic Skills for Experimentalists &middot; TIGP 2026</p>
+      <h1>Load the train</h1>
+    </div>
+  </div>
+  <p class="lede">Drive a locomotive and twenty hopper cars under a grain chute and fill
+    them. The catch is the physics: grain leaves the chute with no forward speed, so every
+    tonne you load has to be dragged up to the speed of the train &mdash; and the train pays
+    for it. <b>The cargo is the thing slowing you down.</b></p>
+  <div class="btns">
+    <a class="btn primary" href="app/">Play the game</a>
+    <a class="btn" href="app/index.html?test">Run the self tests</a>
+    <a class="btn" href="https://github.com/shaynebennetts/load-the-train">Code</a>
+    <a class="btn" href="https://github.com/shaynebennetts/load-the-train/blob/main/SPEC.md">Specification</a>
+  </div>
+</header>
+
+<section class="wrap">
+  <figure>
+    <img src="images/loading.png" alt="The game: grain pours from a fixed chute into car 7,
+      which is 61 per cent full. A heads-up display shows speed, elapsed time, train mass, a
+      loss meter reading 0.000 per cent, and the accretion drag at 79.60 kilonewtons. A strip
+      down the right shows all twenty cars and how full each one is.">
+    <figcaption>Car 7, filling. The <b>DRAG</b> bar is the retarding force
+      <code>v&middot;dM/dt</code> &mdash; the whole point of the game, shown live.</figcaption>
+  </figure>
+</section>
+
+<section class="wrap">
+  <h2>What it is</h2>
+  <div class="cols">
+    <div>
+      <p>A locomotive and twenty open-top grain hoppers start thirty metres short of a fixed
+      loading chute. You move the train; the chute does not move. You open and shut the chute
+      as each car passes under it.</p>
+      <p>It is a pass only if <b>every one of the twenty cars ends at 90&nbsp;% or more</b>
+      and <b>total grain loss stays under 1&nbsp;%</b> of what the chute released. Passing
+      runs are ranked by elapsed time.</p>
+      <p>One HTML file. No build step, no dependencies, no network requests &mdash; it runs
+      from a local file as happily as from the web.</p>
+    </div>
+    <div>
+      <ul class="facts">
+        <li><b>20</b><span>cars, 100 t each</span></li>
+        <li><b>2&thinsp;710 t</b><span>train, fully loaded</span></li>
+        <li><b>1 MW</b><span>locomotive</span></li>
+        <li><b>~91 s</b><span>best possible run</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>The physics is the game</h2>
+  <p>The usual way to write this simulation is to integrate velocity and then bolt on a
+  retarding force for the loading. That way invites a well-known factor-of-two error. This
+  one integrates <b>momentum</b> instead:</p>
+
+  <div class="eq"><code>p = Mv &nbsp;&nbsp;&nbsp; dp/dt = F_traction</code></div>
+
+  <p>Grain arrives with zero forward speed, so the variable-mass law has no extra term in it
+  at all. The retarding force <code>v&middot;dM/dt</code> is never written down anywhere in
+  the code &mdash; it <em>emerges</em> when velocity is recovered as <code>p/M</code>. The
+  mass is added after the mechanical update, which is the perfectly-inelastic-collision
+  picture: momentum is untouched, so velocity drops, and exactly <code>&frac12;v&sup2;dm</code>
+  of kinetic energy disappears into the grain. That is where the factor of two lives.</p>
+
+  <figure>
+    <img src="images/ledger.png" alt="The same scene with the live physics ledger open,
+      listing grain released, grain in cars and grain on the ground, then the traction and
+      regeneration work, the change in kinetic energy and the dissipation term, with the two
+      conservation checks closing to 5.22e-13 and 9.61e-10.">
+    <figcaption>The live ledger, open mid-run. Both conservation laws close to
+      <b>about 1 part in 10<sup>10</sup></b> while you play. The energy accountant is written
+      independently of the integrator on purpose: it is handed raw per-substep samples and
+      re-derives everything itself, so an algebra error in one cannot hide inside the
+      other.</figcaption>
+  </figure>
+
+  <h3>Two numbers shape the whole game</h3>
+  <p>Neither was designed in; both fall out of the parameters.</p>
+  <div class="eq"><code>terminal speed under load &nbsp; &radic;(P/&#7743;) = 6.00 m/s<br>
+    speed at which a car still reaches 90&nbsp;% in one pass = 4.78 m/s</code></div>
+  <p>The first is larger than the second, and that is the entire difficulty. At full power
+  the locomotive <em>outruns the chute</em>: it settles at 6.2 m/s and loads each car to only
+  70&nbsp;%. Holding the throttle down does not work. You have to sit the train in a narrow
+  band of speed and shut the chute over every one of the nineteen coupling gaps &mdash; at
+  4.8 m/s each gap is a <b>0.31 s</b> window, and missing them costs more than the
+  1&nbsp;% loss budget allows.</p>
+</section>
+
+<section class="wrap">
+  <h2>What was verified</h2>
+  <p>Four acceptance tests were specified <em>before</em> the code was written, plus two
+  more of our own. Every &ldquo;closed form&rdquo; column is evaluated from a formula derived
+  in the specification &mdash; never from a recorded output &mdash; so a test cannot be
+  quietly fitted to whatever the program happens to do.</p>
+  <figure>
+    <img src="images/tests.png" alt="The self-test panel reading RUN ALL, ALL PASS, with
+      Test 1, the mass ledger, expanded to show computed and closed-form columns agreeing to
+      a relative error of 2.44e-14.">
+    <figcaption>Open it yourself: <a href="app/index.html?test">the tests run in your
+      browser</a>, against the shipping game rather than a copy of it.</figcaption>
+  </figure>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Test</th><th>What it closes</th>
+      <th>Worst relative error<br><span class="note">(tolerance 10<sup>&minus;3</sup>)</span></th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Mass ledger &mdash; released = in cars + on the ground</td>
+          <td class="n">2.4&times;10<sup>&minus;14</sup></td></tr>
+      <tr><td class="n">2</td><td>Energy ledger &mdash;
+          <code>W_tr &minus; W_br = &Delta;KE + &frac12;&int;v&sup2;dM</code></td>
+          <td class="n">8.3&times;10<sup>&minus;10</sup></td></tr>
+      <tr><td class="n">3</td><td>Constant power from rest, against the closed form</td>
+          <td class="n">3.5&times;10<sup>&minus;10</sup></td></tr>
+      <tr><td class="n">4</td><td>Coasting accretion &mdash; <code>Mv</code> constant</td>
+          <td class="n">5.9&times;10<sup>&minus;9</sup></td></tr>
+      <tr><td class="n">S3</td><td>The adhesion limit, against an exact piecewise solution</td>
+          <td class="n">1.6&times;10<sup>&minus;10</sup></td></tr>
+      <tr><td class="n">D</td><td>Determinism &mdash; identical inputs, identical ledger</td>
+          <td class="n">exact</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Test 1 holds at <em>every</em> substep, not merely over a whole run &mdash;
+  stronger than was asked for. Test 3 runs with the adhesion limit switched off so that the
+  closed form holds verbatim, which is exactly why S3 exists: something has to exercise the
+  limit that governs every real launch.</p>
+</section>
+
+<section class="wrap">
+  <h2>Where it departs from realism, and why</h2>
+  <p>Three parameters are deliberately unrealistic, and the game says so on its own opening
+  screen rather than hiding it.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Quantity</th><th>Realistic</th><th>Used</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Chute flow</td><td class="n">1&thinsp;500&ndash;3&thinsp;000 t/h</td>
+          <td class="n">100&thinsp;000 t/h</td>
+          <td>At a real rate the accretion drag is 75 N against a 710 t train &mdash;
+              invisible.</td></tr>
+      <tr><td>Rated power</td><td class="n">2&ndash;4.5 MW</td><td class="n">1 MW</td>
+          <td>The whole game is low-speed shunting; there is no line haul to do.</td></tr>
+      <tr><td>Approach</td><td class="n">1 km</td><td class="n">30 m</td>
+          <td>A kilometre was a minute of holding full power and nothing else.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Everything else &mdash; 150 t locomotive, 100 t cars, 0.30 wheel&ndash;rail
+  adhesion, <code>g</code> = 9.80665 m/s&sup2; &mdash; is real. There is no fudge factor in
+  the loss model either: grain missing a car is the overlap integral of the chute aperture
+  with the open trough, and nothing else.</p>
+</section>
+
+<footer class="wrap">
+  <p>Built with Claude Code for Basic Skills for Experimentalists, TIGP 2026. The game, its
+  specification, its build plan and its tests are all in
+  <a href="https://github.com/shaynebennetts/load-the-train">the repository</a>.</p>
+</footer>
+
+</body>
+</html>
