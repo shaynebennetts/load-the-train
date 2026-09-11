@@ -307,6 +307,103 @@ const physics = (() => {
 })();
 
 // ===========================================================================
+//  geometry — SPEC.md §2.9. Where the grain loss comes from.
+//
+//  There is NO loss coefficient in this build. Loss falls out of the overlap
+//  of the chute aperture with the open troughs, and nothing else. A fitted
+//  penalty would still feel like a game and would fail every measurement made
+//  of it.
+//
+//  Track coordinates: the chute is at x_chute, +x is forward, and `x` is the
+//  position of the LOCO NOSE. The loco leads (SPEC decision 11), so the train
+//  trails behind the nose:
+//
+//      loco body      [x - L_loco, x]                       captures nothing
+//      car k trough   [F_k - L_body, F_k]     k = 0 .. N-1
+//      F_k = x - L_loco - gap - k*L_pitch     gap = L_pitch - L_body = 1.5 m
+//
+//  so the rear of car N-1 sits at x - 361 m and the train is 361 m long.
+// ===========================================================================
+const geometry = (() => {
+
+  const gapOf = par => par.L_pitch - par.L_body;
+
+  // Front edge of the open trough of car k (0-based).
+  function troughFront(par, x, k) {
+    return x - par.L_loco - gapOf(par) - k * par.L_pitch;
+  }
+
+  // Length of aperture that lies over car k's trough, in metres.
+  function overlap(par, x, k) {
+    const F = troughFront(par, x, k), R = F - par.L_body;
+    const a = par.x_chute - par.w_chute / 2, b = par.x_chute + par.w_chute / 2;
+    const o = Math.min(b, F) - Math.max(a, R);
+    return o > 0 ? o : 0;
+  }
+
+  // Which cars could possibly be under the aperture. O(1) — solved, not
+  // searched, so the per-step cost does not grow with the number of cars.
+  // The aperture (0.8 m) is far narrower than the pitch (17 m), so this is at
+  // most two cars.
+  function range(par, x) {
+    const a = par.x_chute - par.w_chute / 2, b = par.x_chute + par.w_chute / 2;
+    const base = x - par.L_loco - gapOf(par);
+    let lo = Math.ceil((base - par.L_body - b) / par.L_pitch);
+    let hi = Math.floor((base - a) / par.L_pitch);
+    if (lo < 0) lo = 0;
+    if (hi > par.N_cars - 1) hi = par.N_cars - 1;
+    return [lo, hi];
+  }
+
+  // Fraction of released grain that lands in SOME trough, ignoring capacity.
+  // Purely geometric. Integrated over one full pitch this equals L_body/L_pitch.
+  function captureFraction(par, x) {
+    const [lo, hi] = range(par, x);
+    let o = 0;
+    for (let k = lo; k <= hi; k++) o += overlap(par, x, k);
+    return o / par.w_chute;
+  }
+
+  // Deposit `dm` kg of released grain. Returns what was captured and what hit
+  // the ground. Grain is lost to: coupling gaps, the locomotive roof, the space
+  // ahead of car 0, the space beyond the last car, and overflow of a full car.
+  function deposit(st, dm) {
+    if (!(dm > 0)) return { captured: 0, ground: 0 };
+    const par = st.par;
+    const [lo, hi] = range(par, st.x);
+    let captured = 0;
+    for (let k = lo; k <= hi; k++) {
+      const o = overlap(par, st.x, k);
+      if (o <= 0) continue;
+      const want = dm * o / par.w_chute;
+      const room = par.m_cap - st.fill[k];
+      const take = want < room ? want : (room > 0 ? room : 0);
+      st.fill[k] += take;
+      captured += take;
+    }
+    return { captured, ground: dm - captured };
+  }
+
+  // What is under the chute, for the HUD caption (SPEC §5.1). Reported from the
+  // aperture centre.
+  function underChute(par, x) {
+    const c = par.x_chute;
+    if (c > x) return { kind: 'ahead' };
+    if (c >= x - par.L_loco) return { kind: 'loco' };
+    if (c < x - par.L_loco - gapOf(par) - par.N_cars * par.L_pitch + gapOf(par)) {
+      return { kind: 'past' };
+    }
+    const k = Math.floor((x - par.L_loco - gapOf(par) - c) / par.L_pitch);
+    const kk = Math.min(Math.max(k, 0), par.N_cars - 1);
+    const F = troughFront(par, x, kk);
+    if (c <= F && c >= F - par.L_body) return { kind: 'car', index: kk };
+    return { kind: 'gap', index: kk };     // gap behind car kk
+  }
+
+  return { troughFront, overlap, range, captureFraction, deposit, underChute, gapOf };
+})();
+
+// ===========================================================================
 //  LTT — the console API of SPEC.md §7.5. Grows task by task.
 // ===========================================================================
 const CTL_NEUTRAL = { throttle: 0, brake: 0, dir: 1, chute: false };
@@ -317,6 +414,7 @@ let _ctl = Object.assign({}, CTL_NEUTRAL);
 const LTT = {
   params:  () => PARAMS,
   derived: () => DERIVED,
+  geom:    geometry,
 
   reset(over) { _st = physics.create(over); _ctl = Object.assign({}, CTL_NEUTRAL); return LTT; },
 

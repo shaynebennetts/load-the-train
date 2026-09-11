@@ -290,7 +290,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 | Loco length | **21.0 m** | Typical Co-Co over couplers. |
 | Grain bulk density | **0.77 t/m³** | Wheat. Sets the visual fill height: 100 t → 129.9 m³, against a 15.5 × 3.0 × 2.8 m interior = 130.2 m³. Consistent to 0.3 %. |
 | Approach distance | **1000 m** | Given. |
-| Track extent | **−1100 m to +700 m** | Chute at `x = 0`, train nose starts at `x = −1000`. Train is 361 m long, so car 20 reaches the chute with the nose at `+340 m`. 360 m of spare beyond, ample for free shunting. No buffer stops. |
+| Track extent | **−1100 m to +700 m** | Chute at `x = 0`, loco nose starts at `x = −1000`. Train is 361 m long. Car 20's trough reaches the chute with the nose at `+345.5 m`, and its centre sits under the chute at `+353.25 m` (corrected at task 6 from an earlier estimate of +340 m). ~347 m of spare beyond, ample for free shunting. No buffer stops. |
 | **Time compression `C`** | **25** | See §3.1. |
 
 Derived, for reference:
