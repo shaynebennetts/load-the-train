@@ -7,7 +7,7 @@ Project 1, Basic Skills for Experimentalists (TIGP 2026). Brief: `loadthetrainsp
 (Shayne's, authoritative). Repo: `github.com/shaynebennetts/load-the-train`,
 **nothing has ever been pushed** — all work is local commits on `main`.
 
-State as of commit `c936348`.
+State as of commit `c936348`, plus the 1 MW power raise (§3, uncommitted at time of writing).
 
 ---
 
@@ -34,7 +34,7 @@ order. Each is committed separately with its measurements in the commit message.
 | change | from | to | why |
 |---|---|---|---|
 | traction law | `min(throttle·P/v, μmg)` | `throttle · min(P/v, μmg)` | **bug** — see below |
-| rated power | 3.0 MW | 500 kW | twitchy, then overcorrected to 30 kW, then settled |
+| rated power | 3.0 MW | **1 MW** | twitchy, then 30 kW, then 500 kW; raised to 1 MW on Shayne's instruction |
 | chute flow | 2500 t/h | 100 000 t/h (40×) | accretion term was unobservable |
 | time compression `C` | 25 | **1 — none** | timing windows scaled as 1/C and became unplayable |
 | approach | 1000 m | 30 m | 1 km was a minute of holding full power |
@@ -75,27 +75,36 @@ Read `SPEC.md` §2 properly, but the load-bearing facts:
 ### Current parameters
 
 ```
-g 9.80665     m_loco 150 t    m_driven 150 t   P_rated 500 kW   mu 0.30
+g 9.80665     m_loco 150 t    m_driven 150 t   P_rated 1 MW     mu 0.30
 N_cars 20     m_tare 28 t     m_cap 100 t      L_body 15.5 m    L_pitch 17.0 m
 mdot 27 777.8 kg/s (100 000 t/h)               w_chute 0.8 m    L_loco 21 m
 x_start -30   x_min -60       x_max 700        C_time 1         h_step 1/240 s
 fill_target 0.95              loss_budget 0.01                  test_tol 0.001
 ```
 
-Derived: `M_tare` 710 t, `M_full` 2710 t, `F_adhesion` 441.30 kN, `v_cross` 1.133 m/s,
+Derived: `M_tare` 710 t, `M_full` 2710 t, `F_adhesion` 441.30 kN, `v_cross` 2.266 m/s,
 `train_len` 361 m, `t_fill_car` 3.60 s, `t_fill_all` 72.0 s, `gap_duty` 8.82 %.
 
 ### The two numbers that shape the game
 
 ```
-loading terminal speed   v_eq = sqrt(P_rated / mdot) = 4.243 m/s
+loading terminal speed   v_eq = sqrt(P_rated / mdot) = 6.000 m/s
 one-pass fill limit      L_body / (m_cap/mdot)       = 4.306 m/s
 ```
 
-At full throttle with the chute open, the grain holds the train just *below* the speed at
-which a car can still be filled in one pass. That is a coincidence of the chosen parameters,
-not something arranged in code — **if you retune `P_rated` or `mdot`, check it still holds.**
-Past about 500 kW the locomotive outruns the chute and the accretion drag stops governing.
+**At 1 MW the first number is above the second, deliberately.** Until 2026-09-11 it was the
+other way round at 500 kW (4.243 vs 4.306) and the grain held the train just *below* the
+speed at which a car can still be filled in one pass, so holding full throttle from the start
+line to the end of the train was very nearly a winning strategy on its own — measured 94.9 %
+aboard. Shayne asked for 1 MW; the knee is now crossed and full throttle settles at 6.24 m/s
+and gets 69.7 % aboard, so the player must modulate the throttle to stay under 4.31 m/s over
+each car. Full measurements in `SPEC.md` §9 decision 6.
+
+The settled speed is a little above `v_eq` because grain is captured only over the car bodies
+— 91.18 % duty — so the effective flow is `0.9118·mdot`, giving 6.28 m/s.
+
+**If you retune `P_rated` or `mdot` again, recompute both numbers and say which side of the
+knee you are on.** It changes what the game is about.
 
 ---
 
@@ -123,7 +132,10 @@ function loadCore() {
 }
 module.exports = { loadCore };
 // runall.js:  const {loadCore}=require('./harness.js');
-//             console.log(loadCore().runAll().text);
+//             for (const t of loadCore().runAll())
+//               console.log((t.pass ? 'PASS' : 'FAIL') + '  ' + t.id + '  ' + t.title);
+//             runAll() returns an ARRAY of test objects {id,title,rows,pass}; there
+//             is no .text field. Each row is {label,got,pred,unit,relerr,pass}.
 ```
 
 Screenshots were taken by copying `app/index.html` to a temp file, injecting
@@ -148,14 +160,18 @@ broke the moment the flow rate rose 40×. Zero-expectation rows now **require** 
 ## 5. Known open points
 
 1. **Grade bands are invented** (`rules.BANDS`: A < 150 s, B < 180 s, C < 225 s). They have
-   never been calibrated against a real run and are almost certainly wrong now that `C = 1`.
-   PLAN task 22. **Do this first if Shayne wants to play seriously.**
+   never been calibrated against a real run and are almost certainly wrong now that `C = 1`
+   **and more so now that power is 1 MW** — the fastest possible pass is quicker but a
+   single pass no longer fills the train, so run times have not merely shifted, the shape of
+   an optimal run has changed. PLAN task 22. **Do this first if Shayne wants to play
+   seriously.**
 2. **Run length is unmeasured.** With `C = 1` the whole train takes 361 s to pass the chute
-   at 1 m/s, or 85 s at 4.24 m/s. Nobody has played a complete 20-car run end to end.
-   A full run may be too long.
+   at 1 m/s, or 69.4 s at full throttle at 1 MW — but a full-throttle pass leaves the train
+   only 69.7 % loaded, so a real run needs more than one pass or a slower one. Nobody has
+   played a complete 20-car run end to end. A full run may be too long.
 3. **Intro physics wording is a DRAFT** for Shayne to replace. It is marked in the file with
    a red bar and `.draft` / `draftlab` styling. Do not polish it as if it were final.
-4. **Departures from the brief's own text** are in `SPEC.md` §3.2: 500 kW vs its 2–4.5 MW
+4. **Departures from the brief's own text** are in `SPEC.md` §3.2: 1 MW vs its 2–4.5 MW
    band, 30 m vs its 1 km, 100 000 t/h vs its 1500–3000 t/h. All disclosed to the player in
    the intro. The brief's §3.8 explicitly permits raising the flow rate as one of three ways
    to fix the timescale, so that one is in-bounds; the other two are not and are stated as

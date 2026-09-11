@@ -131,15 +131,16 @@ one second of wall clock (25 s simulated):
 | notch | `F_traction` | `a` | reached | travelled |
 |---|---|---|---|---|
 The notch scales the whole `min()`, so 2 % of full effort is 2 % of full effort from rest,
-at any speed. At 500 kW, `v_c = 1.133 m/s`: adhesion governs the launch, constant power
-governs the rest. Full throttle from rest covers 0.31 m in the first second and the 30 m
-approach in 12.5 s.
+at any speed. At 1 MW, `v_c = 2.266 m/s`: adhesion governs the launch, constant power
+governs the rest. Full throttle from rest covers 0.31 m in the first second — unchanged,
+because the first second is adhesion-limited and the power rating does not enter it — and
+the 30 m approach in 10.5 s, arriving at the chute at 4.95 m/s.
 
 The adhesion cap is still mandatory: `P/v` diverges as `v → 0`, which without it produces
 either an instantaneous launch or a NaN at `t = 0`. With the parameters of §3 it binds below
 
 ```
-v_c = P_rated / (μ · m_driven · g) = 500 kW / 441.30 kN = 1.133 m/s
+v_c = P_rated / (μ · m_driven · g) = 1 MW / 441.30 kN = 2.266 m/s
 ```
 
 so adhesion governs the launch and constant power governs everything above a walking pace.
@@ -313,7 +314,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 |---|---|---|
 | Locomotive mass `m_loco` | **150 t** | Mid of the brief's 120–200 t. A six-axle Co-Co road freight unit. |
 | Driven mass `m_driven` | **150 t** | All six axles driven, so the full loco mass sits on driven axles. Cars are unpowered. |
-| Rated power `P_rated` | **0.5 MW** = 500 kW | Below the brief's 2–4.5 MW band, but a realistic rating for a 150 t yard shunter. See §3.2. Set against the accretion drag rather than by feel. |
+| Rated power `P_rated` | **1.0 MW** | Still below the brief's 2–4.5 MW band, but a realistic rating for a large yard shunter. See §3.2. **Deliberately set above the accretion-drag knee** — see §3.2 and decision 6. |
 | Adhesion coefficient `μ` | **0.30** | Mid of the brief's 0.25–0.35 for dry rail with sanding. Gives `F_adhesion = 441.30 kN`. |
 | Car tare `m_tare` | **28 t** | Mid of the brief's 25–30 t. |
 | Car capacity `m_cap` | **100 t** | Top of the brief's 60–100 t, chosen so the 20 × 100 t = 2000 t figure matches the brief's own timescale arithmetic. |
@@ -336,18 +337,18 @@ Derived, for reference:
 | Train tare mass | 710 t |
 | Train fully loaded | 2710 t |
 | Adhesion force | 441.30 kN |
-| Adhesion/constant-power crossover `v_c` | 1.133 m/s |
+| Adhesion/constant-power crossover `v_c` | 2.266 m/s |
 | Launch acceleration, tare | 0.6216 m/s² |
 | Launch acceleration, loaded | 0.1628 m/s² |
-| Tractive effort at 1 m/s (full) | 30.0 kN |
-| Stopping distance from 1 m/s, tare / loaded | 7.9 m / 30.1 m |
+| Tractive effort at 1 m/s (full) | 441.3 kN (adhesion-capped; `P/v` would be 1000 kN) |
+| Stopping distance from 1 m/s, tare / loaded | 0.80 m / 3.07 m (adhesion-limited below `v_c`) |
 | Time to fill one car | 3.60 s (3.42 s to 95 %) |
 | Time to fill all twenty | 72.0 s |
 | Max speed to fill a car in one pass | 4.306 m/s |
 | Accretion drag at 1 m/s | 27.8 kN |
-| Loading terminal speed `sqrt(P/ṁ)` | 4.243 m/s |
-| Accretion drag at that speed | 117.9 kN (adhesion cap 441.3 kN) |
-| Full throttle, 30 m approach | 12.5 s, reaching 4.04 m/s |
+| Loading terminal speed `sqrt(P/ṁ)` | 6.000 m/s — **above** the one-pass limit |
+| Accretion drag at that speed | 166.7 kN (adhesion cap 441.3 kN) |
+| Full throttle, 30 m approach | 10.5 s, reaching 4.95 m/s |
 
 ### 3.1 The timescale choice — stated explicitly
 
@@ -415,16 +416,16 @@ makes the headline effect unobservable, and makes stop-and-fill the only viable 
 in which case `v = 0` and there is no accretion drag at all.
 
 At 100 000 t/h a car fills in 3.6 s and can be filled in one pass at up to 4.31 m/s. The
-accretion drag at 1 m/s is then **27.8 kN**, comparable with the 30 kN of tractive effort
-available at that speed — so the two balance, and full throttle with the chute open has an
-emergent terminal speed
+accretion drag at 1 m/s is then **27.8 kN**, and it rises linearly with speed, so full
+throttle with the chute open has an emergent terminal speed
 
 ```
-v_eq = sqrt( P_rated / ṁ_flow ) = sqrt( 30 kW / 27 777.8 kg/s ) = 1.039 m/s
+v_eq = sqrt( P_rated / ṁ_flow ) = sqrt( 1 MW / 27 777.8 kg/s ) = 6.000 m/s
 ```
 
 which is a genuinely pleasing consequence of the model rather than anything that was put
-in. This is the brief's §3.8 trade-off taken in the direction it left open: it names
+in. **At 1 MW that terminal speed sits above the 4.31 m/s one-pass limit**, so the grain no
+longer holds the train inside the fillable band on its own; the player must. See decision 6. This is the brief's §3.8 trade-off taken in the direction it left open: it names
 raising the flow rate as one of the three permitted ways to fix the timescale.
 
 **No friction brake** (§2.5) is a third departure, though the brief only constrained how a
@@ -710,13 +711,13 @@ exact solution with that initial condition is `v = sqrt(v_0² + 2Pt/M)`, and `v_
 sits fifteen orders of magnitude below `v²` at `t = 1 s`, so it is indistinguishable from the
 brief's formula at the 0.1 % tolerance. **This is stated, not hidden** — see open point 3.
 
-Predictions at `M = 710 t`, `P = 500 kW`, `sqrt(2P/M) = 1.186782`:
+Predictions at `M = 710 t`, `P = 1 MW`, `sqrt(2P/M) = 1.678363`:
 
 | `t` (s) | `v` (m/s) | `s` (m) |
 |---|---|---|
-| 10 | 3.75293 | 25.0196 |
-| 30 | 6.50027 | 130.0054 |
-| 60 | 9.19277 | 367.7108 |
+| 10 | 5.30745 | 35.3830 |
+| 30 | 9.19277 | 183.8554 |
+| 60 | 13.00054 | 520.0217 |
 
 **Supplementary check S3 — the adhesion limit itself.** Beyond the brief's four tests, and
 clearly labelled as an addition Shayne may strike. Because Test 3 runs at `μ → ∞`, nothing
@@ -732,16 +733,16 @@ The offset is **exactly `t_c/2`**, because a constant force from rest delivers p
 the energy that constant power would over the same interval:
 `½Mv_c² = ½·(F_a·v_c)·t_c = ½·P·t_c`. A pleasing result, and easy to check by hand.
 
-At `M = 710 t`: `a = 0.621548 m/s²`, `t_c = 1.822896 s`, `v_c = 1.133018 m/s`,
-`s_c = 1.0327 m`, offset `t_c/2 = 0.911448 s`.
+At `M = 710 t`: `a = 0.621548 m/s²`, `t_c = 3.645793 s`, `v_c = 2.266036 m/s`,
+`s_c = 4.1307 m`, offset `t_c/2 = 1.822896 s`.
 
 | `t` (s) | exact `v` | exact `s` | naive `v` | naive `s` |
 |---|---|---|---|---|
-| 10 | 3.57782 | 22.0223 | 3.75293 (+4.9 %) | 25.0196 (+13.6 %) |
-| 30 | 6.40076 | 124.4702 | 6.50027 (+1.6 %) | 130.0054 (+4.4 %) |
-| 60 | 9.12268 | 359.7082 | 9.19277 (+0.8 %) | 367.7108 (+2.2 %) |
+| 10 | 4.79938 | 27.5403 | 5.30745 (+10.6 %) | 35.3830 (+28.5 %) |
+| 30 | 8.90910 | 168.7321 | 9.19277 (+3.2 %) | 183.8554 (+9.0 %) |
+| 60 | 12.80153 | 497.8809 | 13.00054 (+1.6 %) | 520.0217 (+4.4 %) |
 
-The naive deviation decays only as `t_c/2t`, still 0.15 % at `t = 600 s`, which is why
+The naive deviation decays only as `t_c/2t`, still 0.30 % at `t = 600 s`, which is why
 Test 3 needs `μ → ∞` rather than simply being evaluated late. The panel prints this
 comparison so the discrepancy is on the record rather than buried.
 
@@ -831,11 +832,24 @@ Flagged rather than decided, for Shayne's call:
 3. **Test 3's `v_0 = 10⁻⁶ m/s`** is a departure from "from rest", forced by `P/0`. The exact
    solution with that initial condition is quoted and the difference is `O(v_0²)`, fifteen
    orders below the tolerance — but it is a departure, and is stated as one.
-4. **Power is 100× below the brief's band and the approach is 30 m, not 1 km** (§3.2). Both
+4. **Power is below the brief's band and the approach is 30 m, not 1 km** (§3.2). Both
    are deliberate playability calls made on play feedback, and both are departures from the
    brief's own text rather than from something it left open.
 5. **Physics wording in the intro is a draft** for you to replace (§5.8), marked in the file.
-6. **Rated power settled at 500 kW** (was 30 kW). This sits almost exactly at the point
-   where the locomotive stops being the binding constraint: `v_eq = sqrt(P/ṁ) = 4.243 m/s`
-   against a one-pass fill limit of 4.306 m/s. Any more power and the train can outrun the
-   chute and the accretion drag ceases to govern. Worth re-checking after playtesting.
+6. **Rated power raised to 1 MW** (30 kW → 500 kW → 1 MW), on Shayne's instruction. This
+   **crosses the accretion-drag knee deliberately**: `v_eq = sqrt(P/ṁ) = 6.000 m/s` against
+   a one-pass fill limit of 4.306 m/s, so full throttle now outruns the chute and the grain
+   no longer governs on its own. Measured, one full-throttle pass from the start line with
+   the chute held open, against the shipped code:
+
+   | `P_rated` | pass time | settled `v` | grain aboard | worst car |
+   |---|---|---|---|---|
+   | 500 kW | 91.9 s | 4.46 m/s | **94.9 %** | 91 t |
+   | 1 MW | 69.4 s | 6.24 m/s | **69.7 %** | 68 t |
+
+   At 500 kW holding full throttle all the way very nearly met the 95 % target by itself; at
+   1 MW it does not, and the player has to modulate the throttle to stay under 4.31 m/s over
+   each car. The settled speed exceeds `v_eq` slightly because grain is captured only over
+   the car bodies — 91.18 % duty — so the effective flow is `0.9118·ṁ` and
+   `v_eq/sqrt(0.9118) = 6.28 m/s`, which is what is measured.
+   **This invalidates the grade bands (open point 1) more than `C = 1` already did.**

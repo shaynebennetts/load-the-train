@@ -257,19 +257,20 @@ const PARAMS = Object.freeze({
                            //     road freight unit.
   m_driven: 150000,        // kg. All six axles driven, so the full loco mass
                            //     sits on driven axles. Cars are unpowered.
-  P_rated:  0.5e6,         // W = 500 kW. Below the brief's 2-4.5 MW band but
-                           //     a realistic rating for a 150 t yard shunter,
-                           //     and disclosed (SPEC 3.2). Starting 30 m from
-                           //     the chute there is no line haul to do; the
-                           //     whole game is low-speed shunting.
-                           //     Settled by tuning against the ACCRETION DRAG
-                           //     rather than by feel alone. Full throttle with
-                           //     the chute open has a terminal speed
-                           //       v_eq = sqrt(P/mdot) = 4.24 m/s
-                           //     and a car can still be filled in one pass up
-                           //     to 4.31 m/s — so this is very nearly the
-                           //     largest power at which the grain, not the
-                           //     locomotive, is still the binding constraint.
+  P_rated:  1.0e6,         // W = 1 MW. Still below the brief's 2-4.5 MW band
+                           //     but a realistic rating for a large yard
+                           //     shunter, and disclosed (SPEC 3.2). Starting
+                           //     30 m from the chute there is no line haul to
+                           //     do; the whole game is low-speed shunting.
+                           //     NOTE this is ABOVE the accretion-drag knee.
+                           //     Full throttle with the chute open now has a
+                           //       v_eq = sqrt(P/mdot) = 6.00 m/s
+                           //     against a one-pass fill limit of 4.31 m/s, so
+                           //     the grain no longer holds the train inside the
+                           //     fillable band: the PLAYER must hold it there.
+                           //     Full throttle now overruns cars. That is the
+                           //     deliberate consequence of the raise; see
+                           //     SPEC 3.2 and HANDOVER 3.
   mu:       0.30,          // Wheel-rail adhesion. Mid of the brief's 0.25-0.35
                            //     for dry rail with sanding. -> F_adh 441.30 kN.
   L_loco:   21.0,          // m, over couplers. Typical Co-Co.
@@ -2307,7 +2308,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'train — there is no speeding up or slowing down of the simulation.</p>' +
         '<p>The 150 t locomotive and the 100 t cars are real figures. Two things ' +
         'are not: the chute runs at <b>100 000 t/h</b>, about forty times a real ' +
-        'grain terminal, and the locomotive is a <b>500 kW</b> yard shunter ' +
+        'grain terminal, and the locomotive is a <b>1 MW</b> yard shunter ' +
         'rather than a main-line unit. Both are deliberate. A realistic chute ' +
         'takes 144 s to fill one car, which would mean creeping at 0.1 m/s and ' +
         'feeling nothing; at this rate the grain fights you hard enough to ' +
