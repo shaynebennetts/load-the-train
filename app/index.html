@@ -73,6 +73,148 @@
   .tcard tr.grp td { padding-top: .7rem; color: var(--grain);
                      font-weight: 600; border-bottom: none; }
 
+  /* ---- game ---- */
+  .game { position: absolute; inset: 0; display: flex; flex-direction: column;
+          background: var(--sky-hi); }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .stage { position: relative; flex: 1 1 auto; min-height: 0; }
+
+  /* fill strip: a row of vertical bars in portrait, a column of horizontal
+     bars in landscape, so it never competes with the play view for the scarce
+     dimension. SPEC §5.1. */
+  .strip { display: flex; gap: 2px; background: #2A1E16; padding: 4px;
+           flex: 0 0 auto; }
+  .cell { position: relative; background: #4A362A; border-radius: 2px;
+          overflow: hidden; flex: 1 1 0; }
+  .cell .lvl { position: absolute; background: var(--grain); }
+  .cell .thr { position: absolute; background: #F6EFE3; opacity: .85; }
+  .cell .num { position: absolute; font-size: 9px; line-height: 1;
+               color: #C9B79E; text-align: center; }
+  .cell.done .lvl { background: #6FCB80; }
+  .cell.here { outline: 2px solid #F6EFE3; outline-offset: -2px; }
+  /* portrait: vertical bars, filling upward */
+  .strip { flex-direction: row; height: 58px; }
+  .cell .lvl { left: 0; right: 0; bottom: 0; }
+  .cell .thr { left: 0; right: 0; height: 2px; }
+  .cell .num { left: 0; right: 0; top: 1px; }
+  @media (orientation: landscape) {
+    .game { flex-direction: row-reverse; }
+    .strip { flex-direction: column; height: auto; width: 104px; }
+    .cell .lvl { left: 0; top: 0; bottom: 0; right: auto; }
+    .cell .thr { top: 0; bottom: 0; width: 2px; height: auto; }
+    .cell .num { top: 50%; transform: translateY(-50%); left: 3px;
+                 right: auto; text-align: left; }
+  }
+
+  /* HUD */
+  .hud { position: absolute; left: 8px; right: 148px; top: 0; padding: 6px 0;
+         font-size: 12px; color: #2A1E16; pointer-events: none;
+         text-shadow: 0 1px 0 #ffffff80; }
+  .hud .line1 { display: flex; gap: 10px; align-items: baseline;
+                flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .hud b { font-size: 16px; font-weight: 700; }
+  .hud .cap { color: #5A4233; }
+  .meter { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+  .meter .lab { min-width: 62px; font-size: 10px; letter-spacing: .04em;
+                text-transform: uppercase; color: #5A4233; }
+  .meter .track { position: relative; height: 8px; flex: 1 1 auto; max-width: 190px;
+                  background: #ffffff66; border: 1px solid #3B2A1F55;
+                  border-radius: 4px; overflow: hidden; }
+  .meter .fillbar { position: absolute; left: 0; top: 0; bottom: 0;
+                    background: #4C8C5A; }
+  .meter.over .fillbar { background: var(--barn); }
+  .meter .val { font-variant-numeric: tabular-nums; min-width: 68px; }
+
+  .caption { position: absolute; left: 50%; transform: translateX(-50%);
+             top: 78px; background: #2A1E16D9; color: #F6EFE3;
+             padding: 3px 10px; border-radius: 11px; font-size: 12px;
+             font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
+  .warn { position: absolute; left: 50%; transform: translateX(-50%);
+          top: 106px; background: var(--barn); color: #fff; padding: 3px 10px;
+          border-radius: 11px; font-size: 12px; font-weight: 700; }
+
+  /* controls overlay */
+  .ctrls { position: absolute; inset: 0; pointer-events: none; }
+  .ctrls > * { pointer-events: auto; }
+  .slider { position: absolute; right: 10px; bottom: 12px; width: 74px;
+            height: 46%; min-height: 190px; border-radius: 37px;
+            background: #2A1E16C0; border: 3px solid #3B2A1F;
+            touch-action: none; overflow: hidden; }
+  .slider .zone { position: absolute; left: 0; right: 0; }
+  .slider .zpow { top: 0; height: 50%; background: #2F6B3Ad0; }
+  .slider .zbrk { bottom: 0; height: 50%; background: #8C3A32d0; }
+  .slider .mid { position: absolute; left: 0; right: 0; top: 50%; height: 3px;
+                 background: #F6EFE3; opacity: .7; }
+  .slider .knob { position: absolute; left: 4px; right: 4px; height: 42px;
+                  margin-top: -21px; border-radius: 21px; background: #E8DCC8;
+                  border: 3px solid #3B2A1F; box-shadow: 0 2px 0 #00000040; }
+  .slider .tick { position: absolute; left: 6px; right: 6px; height: 1px;
+                  background: #ffffff40; }
+  .slider .zlab { position: absolute; left: 0; right: 0; text-align: center;
+                  font-size: 10px; font-weight: 700; color: #F6EFE3;
+                  letter-spacing: .06em; opacity: .8; }
+
+  .btn { position: absolute; border-radius: 12px; border: 3px solid #3B2A1F;
+         background: #4A362A; color: #F6EFE3; font-weight: 700;
+         font-size: 13px; letter-spacing: .04em; padding: 0 12px;
+         min-height: 52px; min-width: 84px; cursor: pointer; }
+  .btn.chute { left: 10px; bottom: 12px; min-height: 62px; min-width: 104px;
+               font-size: 15px; }
+  .btn.chute.on { background: var(--grain); color: #2A1E16; border-color: #8A6B28; }
+  .btn.rev { left: 10px; bottom: 84px; min-height: 44px; min-width: 104px;
+             font-size: 12px; }
+  .btn.rev.on { background: var(--barn); }
+  .btn.rev:disabled { opacity: .45; cursor: default; }
+  .btn.done { right: 10px; top: 8px; min-height: 40px; min-width: 70px;
+              font-size: 12px; }
+  .btn.pause { right: 88px; top: 8px; min-height: 40px; min-width: 52px;
+               font-size: 12px; }
+  .btn.ledg { left: 124px; bottom: 12px; min-height: 44px; min-width: 44px;
+              padding: 0; font-size: 17px; }
+
+  /* ledger drawer */
+  .drawer { position: absolute; left: 8px; bottom: 66px; width: min(26rem, 74vw);
+            background: #241A13F2; border: 2px solid #4A362A; border-radius: 9px;
+            padding: .6rem .7rem; font-size: 11.5px; color: #E8DCC8;
+            font-variant-numeric: tabular-nums; }
+  .drawer h3 { margin: 0 0 .35rem; font-size: 11px; letter-spacing: .08em;
+               text-transform: uppercase; color: #A08A72; }
+  .drawer table { width: 100%; border-collapse: collapse; }
+  .drawer td { padding: 1px 0; }
+  .drawer td + td { text-align: right; font-family: ui-monospace, Menlo,
+                    Consolas, monospace; }
+  .drawer .sep td { border-top: 1px solid #4A362A; padding-top: .3rem; }
+
+  /* modal cards: intro, report, title */
+  .modal { position: absolute; inset: 0; background: #14100CE0;
+           display: flex; align-items: center; justify-content: center;
+           padding: 16px; overflow-y: auto; }
+  .card { background: #241A13; border: 3px solid #4A362A; border-radius: 14px;
+          padding: 1.1rem 1.2rem 1rem; max-width: 34rem; width: 100%;
+          color: #E8DCC8; max-height: 100%; overflow-y: auto; }
+  .card h2 { margin: 0 0 .2rem; font-size: 1.15rem; color: #F6EFE3; }
+  .card h3 { margin: .9rem 0 .2rem; font-size: .82rem; letter-spacing: .07em;
+             text-transform: uppercase; color: var(--grain); }
+  .card p { margin: .45rem 0; line-height: 1.5; }
+  .card ul { margin: .4rem 0; padding-left: 1.1rem; }
+  .card li { margin: .25rem 0; }
+  .card .draft { border-left: 3px solid var(--barn); padding-left: .7rem;
+                 background: #2E211899; }
+  .card .draftlab { color: #FF8A7A; font-size: .72rem; font-weight: 700;
+                    letter-spacing: .08em; text-transform: uppercase; }
+  .card .keys { font-size: .85rem; color: #C9B79E; }
+  .cardbtns { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .9rem; }
+  .dots { display: flex; gap: 5px; margin-top: .8rem; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #4A362A; }
+  .dot.on { background: var(--grain); }
+  .big { font-size: 2rem; font-weight: 800; letter-spacing: .02em; }
+  .pass { color: #9BE0A8; } .fail { color: #FF8A7A; }
+  .rpt { width: 100%; border-collapse: collapse; font-size: .9rem;
+         font-variant-numeric: tabular-nums; }
+  .rpt td { padding: .18rem 0; border-bottom: 1px solid #ffffff14; }
+  .rpt td + td { text-align: right; font-family: ui-monospace, Menlo,
+                 Consolas, monospace; }
+
   .notes { color: #C9B79E; font-size: .87rem; margin: .8rem 0 .3rem;
            max-width: 52rem; }
   .tol { color: #8A7460; font-size: .78rem; margin: 0; }
@@ -219,6 +361,12 @@ const physics = (() => {
       p: 0,                                   // kg m/s, = M*v
       fill: new Float64Array(par.N_cars),     // kg of grain in each car
       m_grain: 0,                             // cached sum of `fill`
+      // Where spilled grain landed, in 2 m bins along the track. Drawn as
+      // mounds so the player can see where they wasted it. Purely a record —
+      // it never feeds back into the physics. Its total must equal the
+      // ledger's m_ground (PLAN task 13).
+      spill: new Float64Array(Math.ceil((par.x_max - par.x_min) / 2) + 1),
+      spill_bin: 2,
       L: null,                                // ledger accumulator, if attached
       // instrumentation, not physics
       n_base: 0, n_sub: 0, max_sub_per_base: 0,
@@ -327,6 +475,12 @@ const physics = (() => {
       dm_rel = st.par.mdot * r.dt;
       dep = geometry.deposit(st.par, st.fill, x_mid, dm_rel);
       st.m_grain += dep.captured;
+      if (dep.ground > 0) {
+        // Grain falls straight down, so it lands at the chute, not at the
+        // train. The pile builds under the chute wherever the train is not.
+        const b = Math.round((st.par.x_chute - st.par.x_min) / st.spill_bin);
+        if (b >= 0 && b < st.spill.length) st.spill[b] += dep.ground;
+      }
     }
 
     st.t += r.dt;
@@ -640,6 +794,56 @@ const ledger = (() => {
   }
 
   return { create, accumulate, report };
+})();
+
+// ===========================================================================
+//  rules — SPEC.md §5.6. The two gates, and nothing else.
+//
+//  Both thresholds stay thresholds: a run passes or it does not. There is no
+//  composite score and no partial credit. Passing runs are ranked by elapsed
+//  time alone, which is a measured quantity rather than an invented one.
+// ===========================================================================
+const rules = (() => {
+
+  // Gate 1: every car at or above 95 % of capacity.
+  // Gate 2: grain on the ground below 1 % of grain RELEASED — the same two
+  //         quantities Test 1's mass ledger closes on (SPEC decision 14).
+  function verdict(st, L) {
+    const p = st.par;
+    const under = [];
+    let minFrac = Infinity, minCar = 1;
+    for (let i = 0; i < st.fill.length; i++) {
+      const f = st.fill[i] / p.m_cap;
+      if (f < minFrac) { minFrac = f; minCar = i + 1; }
+      if (f < p.fill_target) under.push(i + 1);
+    }
+    const loss = L.m_released > 0 ? L.m_ground / L.m_released : 0;
+    const fillPass = under.length === 0;
+    const lossPass = loss < p.loss_budget;
+    return {
+      minFrac, minCar, under, fillPass,
+      loss, lossPass,
+      pass: fillPass && lossPass,
+      m_released: L.m_released, m_cars: L.m_cars, m_ground: L.m_ground,
+    };
+  }
+
+  // Provisional bands, to be calibrated by playtesting (PLAN task 22).
+  const BANDS = [[150, 'A'], [180, 'B'], [225, 'C']];
+  function grade(tWall) {
+    for (const [lim, g] of BANDS) if (tWall < lim) return g;
+    return 'D';
+  }
+
+  // Distance needed to stop from speed v at full brake. Used for the trip stop
+  // that keeps the train on the track without inventing a crash state: the
+  // brake is applied through the normal control path, so the energy it removes
+  // lands in W_brake like any other braking and the ledger still closes.
+  function stopDistance(par, v) {
+    return (v * v) / (2 * Math.min(par.k_brake, par.mu) * par.g);
+  }
+
+  return { verdict, grade, stopDistance, BANDS };
 })();
 
 // ===========================================================================
@@ -1103,6 +1307,14 @@ const LTT = {
     };
   },
 
+  // Live references for the game loop. The game drives controls by mutating
+  // ctlRef() in place, which is the same object the integrator reads, so there
+  // is exactly one control state and no copy to fall out of step.
+  stateRef: () => _st,
+  ctlRef:   () => _ctl,
+  speed:    () => physics.speed(_st),
+  mass:     () => physics.mass(_st),
+
   runTest(n, opts) { return tests.run(n, opts); },
   runAll(opts)      { return tests.runAll(opts); },
   tests,
@@ -1299,23 +1511,779 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
     }, 0);
   }
 
+  // =========================================================================
+  //  GAME
+  // =========================================================================
+  const P = LTT.params(), D = LTT.derived();
+  const G = LTT.geom;
+  const GAP = P.L_pitch - P.L_body;
+
+  // --- persistence (SPEC §5.5) --------------------------------------------
+  // Best passing time and the intro-seen flag only. Every access is wrapped:
+  // a private window with site data blocked must still play normally.
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('ltt.' + k);
+                      return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('ltt.' + k, JSON.stringify(v)); }
+                catch (e) { /* storage unavailable; the game does not depend on it */ } },
+    del(k)    { try { localStorage.removeItem('ltt.' + k); } catch (e) {} },
+  };
+
+  // --- run state -----------------------------------------------------------
+  const S = {
+    mode: 'title',        // title | intro | run | paused | report
+    practice: false,
+    started: false,       // clock starts on the first real input
+    tWall: 0,
+    slider: 0,            // -1 full brake .. 0 neutral .. +1 full power
+    dir: 1,
+    chute: false,
+    tripped: false,
+    drawer: false,
+    introPage: 0,
+    verdict: null,
+  };
+  let st = null, ctl = null;
+
+  function newRun(practice) {
+    LTT.reset();
+    LTT.setState({ throttle: 0, brake: 0, dir: 1, chute: false });
+    LTT.arm();
+    st = LTT.stateRef();
+    ctl = LTT.ctlRef();
+    S.practice = !!practice;
+    S.started = false; S.tWall = 0; S.slider = 0; S.dir = 1;
+    S.chute = false; S.tripped = false; S.verdict = null;
+    S.drawer = !!practice;
+    camX = st.x + 12;
+    spark.length = 0;
+    S.mode = 'run';
+  }
+
+  // --- seeded PRNG for cosmetic particles ---------------------------------
+  // Kept in its own stream. The physics never reads it, so particle activity
+  // cannot perturb a trajectory (SPEC §4.2).
+  let seed = 0x2F6E2B1 >>> 0;
+  function rnd() {
+    seed ^= seed << 13; seed >>>= 0;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;  seed >>>= 0;
+    return seed / 4294967296;
+  }
+
+  // --- canvas --------------------------------------------------------------
+  let cv, ctx, W = 0, H = 0, dpr = 1, camX = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const r = cv.getBoundingClientRect();
+    W = Math.max(1, Math.round(r.width));
+    H = Math.max(1, Math.round(r.height));
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+
+  // Camera: look ahead of the nose while approaching, then lock to the chute,
+  // because once the train is in range that is where everything happens.
+  function camTarget() {
+    return st.x < P.x_chute - 12 ? st.x + 12 : P.x_chute;
+  }
+
+  // --- cosmetic grain particles (fixed pool) -------------------------------
+  const spark = [];
+  const SPARK_MAX = 400;
+
+  function updateSparks(dtWall, scale) {
+    // Landing is instantaneous in the physics; this is decoration only.
+    const spoutY = -P.h_chute;             // metres above the car rim datum
+    if (S.chute && (S.mode === 'run')) {
+      const want = 16;
+      for (let i = 0; i < want && spark.length < SPARK_MAX; i++) {
+        spark.push({
+          x: P.x_chute + (rnd() - 0.5) * P.w_chute,
+          y: spoutY, vy: 5 + rnd() * 3, r: 0.16 + rnd() * 0.12,
+        });
+      }
+    }
+    const dt = dtWall * P.C_time;
+    for (let i = spark.length - 1; i >= 0; i--) {
+      const s = spark[i];
+      s.vy += P.g * dt * 0.25;
+      s.y += s.vy * dt;
+      if (s.y > 1.2) spark.splice(i, 1);
+    }
+  }
+
+  // ------------------------------------------------------------------ draw
+  function draw(dtWall) {
+    const scale = clamp(W / 26, 12, 34);
+    const railY = Math.round(H * 0.74);
+    // Smooth for ordinary motion, but snap when the target is far away — at the
+    // start of a run, or after the train is repositioned. Lerping across a
+    // kilometre would leave the player watching empty track for a second.
+    const ct = camTarget();
+    camX = Math.abs(ct - camX) > 150 ? ct
+                                     : camX + (ct - camX) * (1 - Math.exp(-dtWall * 7));
+    const sx = x => (x - camX) * scale + W * 0.55;
+    const m = v => v * scale;                       // metres -> pixels
+
+    // sky
+    const sky = ctx.createLinearGradient(0, 0, 0, railY);
+    sky.addColorStop(0, '#7FC4CE'); sky.addColorStop(1, '#BFE3E8');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, railY);
+
+    drawBackdrop(sx, m, railY, scale);
+    drawGround(sx, m, railY, scale);
+    drawSpill(sx, m, railY, scale);
+    drawTrain(sx, m, railY, scale);
+    drawChute(sx, m, railY, scale);
+    drawSparks(sx, m, railY, scale);
+  }
+
+  const OUT = '#3B2A1F';
+  function stroke(w) { ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+                       ctx.strokeStyle = OUT; ctx.lineWidth = w; ctx.stroke(); }
+  function rrect(x, y, w, h, r) {
+    r = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);         ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBackdrop(sx, m, railY, scale) {
+    // grain elevator behind the chute — gives the scene a place to be
+    const bx = sx(P.x_chute) - m(38), bw = m(11), bh = m(15);
+    ctx.fillStyle = '#8E7B6A';
+    ctx.fillRect(bx, railY - bh, bw, bh); stroke(2);
+    ctx.beginPath(); ctx.rect(bx, railY - bh, bw, bh); stroke(2.5);
+    ctx.fillStyle = '#A89684';
+    for (let i = 0; i < 3; i++) {
+      const cx = bx + bw * (0.18 + i * 0.32);
+      ctx.beginPath(); ctx.arc(cx, railY - bh, m(1.7), Math.PI, 0); ctx.fill(); stroke(2);
+    }
+    // low hills
+    ctx.fillStyle = '#9CCBB0';
+    ctx.beginPath(); ctx.moveTo(0, railY);
+    for (let i = 0; i <= 8; i++) {
+      const x = (W / 8) * i;
+      ctx.lineTo(x, railY - m(3) - Math.sin(i * 1.7 + 0.6) * m(1.8));
+    }
+    ctx.lineTo(W, railY); ctx.closePath(); ctx.fill();
+  }
+
+  function drawGround(sx, m, railY, scale) {
+    ctx.fillStyle = '#8A6F52'; ctx.fillRect(0, railY, W, H - railY);
+    ctx.fillStyle = '#7A6146'; ctx.fillRect(0, railY, W, m(0.35));
+    // sleepers, spaced in world units so they slide with the train
+    ctx.fillStyle = '#6B5238';
+    const sp = 0.7, x0 = Math.floor((camX - 30) / sp) * sp;
+    for (let x = x0; x < camX + 40; x += sp) {
+      ctx.fillRect(sx(x), railY + m(0.10), Math.max(2, m(0.28)), m(0.5));
+    }
+    // rail
+    ctx.fillStyle = '#5A4233'; ctx.fillRect(0, railY - m(0.12), W, Math.max(2, m(0.16)));
+    // track limits
+    for (const lim of [P.x_min, P.x_max]) {
+      const px = sx(lim);
+      if (px > -40 && px < W + 40) {
+        ctx.fillStyle = '#C4483A';
+        ctx.fillRect(px - 3, railY - m(2.2), 6, m(2.2));
+        ctx.beginPath(); ctx.rect(px - 3, railY - m(2.2), 6, m(2.2)); stroke(2);
+      }
+    }
+  }
+
+  function drawSpill(sx, m, railY, scale) {
+    // mounds from the heightfield, so the player can see where it went
+    const bin = st.spill_bin;
+    for (let i = 0; i < st.spill.length; i++) {
+      const kg = st.spill[i]; if (kg < 20) continue;
+      const wx = P.x_min + i * bin;
+      const px = sx(wx); if (px < -60 || px > W + 60) continue;
+      // a 2 m bin of wheat, spread to a shallow heap
+      const hgt = Math.min(2.2, Math.cbrt(kg / P.rho_grain) * 0.45);
+      const wid = Math.max(bin, hgt * 3.2);
+      ctx.fillStyle = '#D9A63F';
+      ctx.beginPath();
+      ctx.moveTo(px - m(wid / 2), railY + m(0.3));
+      ctx.quadraticCurveTo(px, railY - m(hgt), px + m(wid / 2), railY + m(0.3));
+      ctx.closePath(); ctx.fill(); stroke(2);
+    }
+  }
+
+  function wheels(cx0, cx1, railY, m) {
+    const r = m(0.52);
+    for (const cx of [cx0, cx1]) {
+      ctx.fillStyle = '#4A362A';
+      ctx.beginPath(); ctx.arc(cx, railY - r, r, 0, 6.2832); ctx.fill(); stroke(2);
+      ctx.fillStyle = '#6B5238';
+      ctx.beginPath(); ctx.arc(cx, railY - r, r * 0.42, 0, 6.2832); ctx.fill(); stroke(1.5);
+    }
+  }
+
+  function drawTrain(sx, m, railY, scale) {
+    const floor = railY - m(1.15);
+    // cars, only those on screen
+    const under = G.underChute(P, st.x);
+    for (let k = 0; k < P.N_cars; k++) {
+      const F = G.troughFront(P, st.x, k), R = F - P.L_body;
+      if (sx(F) < -80 || sx(R) > W + 80) continue;
+      const x0 = sx(R), x1 = sx(F), bw = x1 - x0;
+      const bh = m(P.car_d), top = floor - bh;
+
+      wheels(x0 + bw * 0.18, x1 - bw * 0.18, railY, m);
+
+      // body shell
+      ctx.fillStyle = '#C9A66B';
+      rrect(x0, top, bw, bh + m(0.25), m(0.28)); ctx.fill(); stroke(2.5);
+      // interior well
+      ctx.fillStyle = '#6E5A44';
+      rrect(x0 + m(0.28), top + m(0.22), bw - m(0.56), bh - m(0.22), m(0.18));
+      ctx.fill();
+      // grain
+      const frac = clamp(st.fill[k] / P.m_cap, 0, 1);
+      if (frac > 0.001) {
+        const gh = (bh - m(0.22)) * frac;
+        ctx.save(); ctx.clip();
+        ctx.fillStyle = frac >= P.fill_target ? '#F0C558' : '#E8B54A';
+        ctx.fillRect(x0 + m(0.28), top + m(0.22) + (bh - m(0.22) - gh),
+                     bw - m(0.56), gh + m(0.3));
+        ctx.restore();
+      }
+      // 95 % line on the car itself
+      const ty = top + m(0.22) + (bh - m(0.22)) * (1 - P.fill_target);
+      ctx.strokeStyle = '#F6EFE3'; ctx.lineWidth = 1.6;
+      ctx.setLineDash([m(0.35), m(0.28)]);
+      ctx.beginPath(); ctx.moveTo(x0 + m(0.3), ty); ctx.lineTo(x1 - m(0.3), ty);
+      ctx.stroke(); ctx.setLineDash([]);
+      // outline over the top
+      rrect(x0, top, bw, bh + m(0.25), m(0.28)); stroke(2.5);
+      // number
+      if (bw > 26) {
+        ctx.fillStyle = '#3B2A1F'; ctx.font = '700 ' + Math.min(15, m(1.1)) + 'px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(k + 1), (x0 + x1) / 2, floor + m(0.02));
+      }
+      if (under.kind === 'car' && under.index === k) {
+        ctx.strokeStyle = '#F6EFE3'; ctx.lineWidth = 2.5;
+        rrect(x0 - 3, top - 3, bw + 6, bh + m(0.25) + 6, m(0.32)); ctx.stroke();
+      }
+      // coupling to the next car
+      const nx = sx(R - GAP);
+      ctx.fillStyle = '#4A362A';
+      ctx.fillRect(nx, floor - m(0.25), x0 - nx, Math.max(2, m(0.22)));
+    }
+
+    // locomotive
+    const lx1 = sx(st.x), lx0 = sx(st.x - P.L_loco);
+    if (lx1 > -120 && lx0 < W + 120) {
+      const bw = lx1 - lx0, bh = m(3.1), top = floor - bh;
+      wheels(lx0 + bw * 0.16, lx1 - bw * 0.16, railY, m);
+      wheels(lx0 + bw * 0.40, lx0 + bw * 0.62, railY, m);
+      // hood
+      ctx.fillStyle = '#C4483A';
+      rrect(lx0, top + m(0.9), bw, bh - m(0.9) + m(0.25), m(0.3)); ctx.fill(); stroke(2.5);
+      // cab
+      const cw = bw * 0.36;
+      ctx.fillStyle = '#A93A2E';
+      rrect(lx0 + m(0.3), top, cw, bh * 0.62, m(0.28)); ctx.fill(); stroke(2.5);
+      // windows
+      ctx.fillStyle = '#BFE3E8';
+      rrect(lx0 + m(0.75), top + m(0.35), cw - m(0.95), bh * 0.3, m(0.18));
+      ctx.fill(); stroke(1.8);
+      // chimney
+      ctx.fillStyle = '#4A362A';
+      rrect(lx1 - bw * 0.3, top + m(0.35), m(0.9), m(0.75), m(0.12));
+      ctx.fill(); stroke(2);
+      // stripe
+      ctx.fillStyle = '#E8B54A';
+      ctx.fillRect(lx0 + m(0.3), floor - m(0.75), bw - m(0.6), Math.max(2, m(0.3)));
+      if (under.kind === 'loco') {
+        ctx.strokeStyle = '#FF8A7A'; ctx.lineWidth = 3;
+        rrect(lx0 - 3, top - 3, bw + 6, bh + m(0.25) + 6, m(0.34)); ctx.stroke();
+      }
+    }
+  }
+
+  function drawChute(sx, m, railY, scale) {
+    const cx = sx(P.x_chute);
+    const rim = railY - m(1.15 + P.car_d);        // car rim datum
+    const spout = rim - m(P.h_chute);
+    // tower
+    ctx.fillStyle = '#A89684';
+    ctx.fillRect(cx - m(1.35), 0, m(2.7), spout - m(1.6));
+    ctx.beginPath(); ctx.rect(cx - m(1.35), -4, m(2.7), spout - m(1.6) + 4); stroke(2.5);
+    // hopper
+    ctx.fillStyle = '#8E7B6A';
+    ctx.beginPath();
+    ctx.moveTo(cx - m(1.35), spout - m(1.6));
+    ctx.lineTo(cx + m(1.35), spout - m(1.6));
+    ctx.lineTo(cx + m(P.w_chute / 2), spout);
+    ctx.lineTo(cx - m(P.w_chute / 2), spout);
+    ctx.closePath(); ctx.fill(); stroke(2.5);
+    // gate
+    ctx.fillStyle = S.chute ? '#6FCB80' : '#C4483A';
+    ctx.fillRect(cx - m(P.w_chute / 2) - 2, spout - 3, m(P.w_chute) + 4, 6);
+    ctx.beginPath(); ctx.rect(cx - m(P.w_chute / 2) - 2, spout - 3, m(P.w_chute) + 4, 6);
+    stroke(2);
+    // aperture guide line to the ground
+    ctx.strokeStyle = '#3B2A1F30'; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.moveTo(cx, spout); ctx.lineTo(cx, railY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawSparks(sx, m, railY, scale) {
+    const rim = railY - m(1.15 + P.car_d);
+    ctx.fillStyle = '#E8B54A';
+    for (const s of spark) {
+      const py = rim + m(s.y + P.h_chute) - m(P.h_chute);
+      ctx.beginPath(); ctx.arc(sx(s.x), rim + m(s.y), Math.max(1.2, m(s.r)), 0, 6.2832);
+      ctx.fill();
+    }
+  }
+
+  // ------------------------------------------------------------------ HUD
+  let el = {};
+  function buildGame() {
+    app.innerHTML = '';
+    const g = document.createElement('div'); g.className = 'game';
+
+    const strip = document.createElement('div'); strip.className = 'strip';
+    el.cells = [];
+    for (let i = 0; i < P.N_cars; i++) {
+      const c = document.createElement('div'); c.className = 'cell';
+      const lvl = document.createElement('div'); lvl.className = 'lvl';
+      const thr = document.createElement('div'); thr.className = 'thr';
+      const num = document.createElement('div'); num.className = 'num';
+      num.textContent = i + 1;
+      c.appendChild(lvl); c.appendChild(thr); c.appendChild(num);
+      strip.appendChild(c); el.cells.push({ c, lvl, thr });
+    }
+    g.appendChild(strip);
+
+    const stage = document.createElement('div'); stage.className = 'stage';
+    cv = document.createElement('canvas'); ctx = cv.getContext('2d');
+    stage.appendChild(cv);
+
+    const hud = document.createElement('div'); hud.className = 'hud';
+    hud.innerHTML =
+      '<div class="line1"><b id="hv">0.00</b><span class="cap">m/s</span>' +
+      '<b id="ht">0:00.0</b><span class="cap" id="hts">sim 0:00</span>' +
+      '<b id="hm">710</b><span class="cap">t</span></div>' +
+      '<div class="meter" id="mloss"><span class="lab">loss</span>' +
+      '<span class="track"><span class="fillbar" id="blos"></span></span>' +
+      '<span class="val" id="vlos">0.000 % / 1 %</span></div>' +
+      '<div class="meter" id="macc"><span class="lab">drag v·dM/dt</span>' +
+      '<span class="track"><span class="fillbar" id="bacc"></span></span>' +
+      '<span class="val" id="vacc">0 kN</span></div>';
+    stage.appendChild(hud);
+
+    const cap = document.createElement('div'); cap.className = 'caption';
+    cap.id = 'cap'; cap.textContent = '—'; stage.appendChild(cap);
+    const warn = document.createElement('div'); warn.className = 'warn';
+    warn.id = 'warn'; warn.hidden = true; warn.textContent = 'END OF TRACK — BRAKING';
+    stage.appendChild(warn);
+
+    const ctrls = document.createElement('div'); ctrls.className = 'ctrls';
+    ctrls.innerHTML =
+      '<button class="btn ledg" id="bledg" title="physics ledger">∑</button>' +
+      '<button class="btn pause" id="bpause">PAUSE</button>' +
+      '<button class="btn done" id="bdone">DONE</button>' +
+      '<button class="btn rev" id="brev">FORWARD</button>' +
+      '<button class="btn chute" id="bchute">CHUTE</button>' +
+      '<div class="slider" id="sl">' +
+        '<div class="zone zpow"></div><div class="zone zbrk"></div>' +
+        '<div class="zlab" style="top:6px">POWER</div>' +
+        '<div class="zlab" style="bottom:6px">BRAKE</div>' +
+        '<div class="mid"></div><div class="knob" id="knob"></div></div>';
+    stage.appendChild(ctrls);
+
+    const drawer = document.createElement('div'); drawer.className = 'drawer';
+    drawer.id = 'drawer'; drawer.hidden = true; stage.appendChild(drawer);
+
+    g.appendChild(stage);
+    app.appendChild(g);
+
+    el.hv = document.getElementById('hv'); el.ht = document.getElementById('ht');
+    el.hts = document.getElementById('hts'); el.hm = document.getElementById('hm');
+    el.blos = document.getElementById('blos'); el.vlos = document.getElementById('vlos');
+    el.bacc = document.getElementById('bacc'); el.vacc = document.getElementById('vacc');
+    el.mloss = document.getElementById('mloss');
+    el.cap = document.getElementById('cap'); el.warn = document.getElementById('warn');
+    el.knob = document.getElementById('knob'); el.sl = document.getElementById('sl');
+    el.bchute = document.getElementById('bchute'); el.brev = document.getElementById('brev');
+    el.bdone = document.getElementById('bdone'); el.bpause = document.getElementById('bpause');
+    el.drawer = drawer; el.bledg = document.getElementById('bledg');
+
+    wireInput();
+    resize();
+  }
+
+  const mmss = t => { t = Math.max(0, t || 0);
+    return Math.floor(t / 60) + ':' + (t % 60 < 10 ? '0' : '') + (t % 60).toFixed(1); };
+  const mmssS = t => { t = Math.max(0, t || 0);
+    return Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0'); };
+
+  function updateHUD() {
+    const v = LTT.speed(), M = LTT.mass(), L = LTT.ledger();
+    el.hv.textContent = v.toFixed(2);
+    el.ht.textContent = mmss(S.tWall);
+    el.hts.textContent = 'sim ' + mmssS(st.t);
+    el.hm.textContent = (M / 1000).toFixed(1);
+
+    const lossFrac = L.m_released > 0 ? L.m_ground / L.m_released : 0;
+    el.blos.style.width = clamp(lossFrac / P.loss_budget, 0, 1) * 100 + '%';
+    el.mloss.classList.toggle('over', lossFrac >= P.loss_budget);
+    el.vlos.textContent = (100 * lossFrac).toFixed(3) + ' % / 1 %';
+
+    // The accretion retarding force, live. v*dM/dt with dM/dt the CAPTURED
+    // flow — grain that misses is never accelerated, so it exerts nothing.
+    const capturing = S.chute ? G.captureFraction(P, st.x) : 0;
+    const drag = Math.abs(v) * P.mdot * capturing;
+    el.bacc.style.width = clamp(drag / 3000, 0, 1) * 100 + '%';
+    el.vacc.textContent = drag < 1 ? '0 kN' : (drag / 1000).toFixed(2) + ' kN';
+
+    const u = G.underChute(P, st.x);
+    el.cap.textContent =
+      u.kind === 'car'  ? 'CAR ' + (u.index + 1) + '  ·  ' +
+                          (100 * st.fill[u.index] / P.m_cap).toFixed(1) + ' %'
+    : u.kind === 'gap'  ? (u.index + 1 >= P.N_cars ? 'BEHIND CAR ' + P.N_cars
+                                                   : 'GAP ' + (u.index + 1) + '–' + (u.index + 2))
+    : u.kind === 'loco' ? 'LOCOMOTIVE — grain is being wasted'
+    : u.kind === 'ahead' ? 'CHUTE AHEAD OF THE TRAIN'
+    : 'PAST THE LAST CAR';
+
+    el.warn.hidden = !S.tripped;
+    el.bchute.classList.toggle('on', S.chute);
+    el.brev.classList.toggle('on', S.dir < 0);
+    el.brev.textContent = S.dir < 0 ? 'REVERSE' : 'FORWARD';
+    el.brev.disabled = Math.abs(v) >= 0.2;
+
+    for (let i = 0; i < P.N_cars; i++) {
+      const f = clamp(st.fill[i] / P.m_cap, 0, 1);
+      const c = el.cells[i];
+      const land = window.matchMedia('(orientation: landscape)').matches;
+      if (land) { c.lvl.style.width = f * 100 + '%'; c.lvl.style.height = '';
+                  c.thr.style.left = P.fill_target * 100 + '%'; c.thr.style.top = ''; }
+      else      { c.lvl.style.height = f * 100 + '%'; c.lvl.style.width = '';
+                  c.thr.style.bottom = P.fill_target * 100 + '%'; c.thr.style.left = ''; }
+      c.c.classList.toggle('done', f >= P.fill_target);
+      c.c.classList.toggle('here', u.kind === 'car' && u.index === i);
+    }
+
+    if (S.drawer) {
+      el.drawer.hidden = false;
+      const row = (a, b) => '<tr><td>' + a + '</td><td>' + b + '</td></tr>';
+      const MJ = j => (j / 1e6).toFixed(3) + ' MJ';
+      const t = x => (x / 1000).toFixed(2) + ' t';
+      el.drawer.innerHTML = '<h3>ledger — live</h3><table>' +
+        row('released', t(L.m_released)) + row('in cars', t(L.m_cars)) +
+        row('on the ground', t(L.m_ground)) +
+        '<tr class="sep"><td>Test 1 closure</td><td>' +
+          L.mass_closure.toExponential(2) + '</td></tr>' +
+        row('W_traction', MJ(L.W_traction)) + row('W_brake', MJ(L.W_brake)) +
+        row('ΔKE_total', MJ(L.dKE)) + row('E_diss = ½∫v²dM', MJ(L.E_diss)) +
+        '<tr class="sep"><td>Test 2 closure</td><td>' +
+          L.energy_closure.toExponential(2) + '</td></tr>' +
+        '</table>';
+    } else el.drawer.hidden = true;
+  }
+
+  // ---------------------------------------------------------------- input
+  function setSlider(v) {
+    S.slider = clamp(v, -1, 1);
+    const h = el.sl.clientHeight, k = 42;
+    el.knob.style.top = ((0.5 - S.slider * 0.5) * (h - k) + k / 2) + 'px';
+    if (S.slider !== 0) S.started = true;
+  }
+  function wireInput() {
+    // Sticky slider: it holds where released, like a locomotive controller.
+    let drag = false;
+    const fromEvent = e => {
+      const r = el.sl.getBoundingClientRect();
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+      const k = 42;
+      return clamp((0.5 - (y - k / 2) / (r.height - k)) * 2, -1, 1);
+    };
+    const down = e => { drag = true; setSlider(fromEvent(e)); e.preventDefault(); };
+    const move = e => { if (drag) { setSlider(fromEvent(e)); e.preventDefault(); } };
+    const up = () => { drag = false; };
+    el.sl.addEventListener('pointerdown', down);
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+
+    el.bchute.onclick = () => { S.chute = !S.chute; S.started = true; };
+    el.brev.onclick = () => { if (Math.abs(LTT.speed()) < 0.2) S.dir = -S.dir; };
+    el.bdone.onclick = () => finish();
+    el.bpause.onclick = () => togglePause();
+    el.bledg.onclick = () => { S.drawer = !S.drawer; };
+
+    window.addEventListener('keydown', e => {
+      if (S.mode !== 'run' && S.mode !== 'paused') return;
+      const k = e.key;
+      if (k === 'ArrowUp')   { setSlider(S.slider + 0.05); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSlider(S.slider - 0.05); e.preventDefault(); }
+      else if (k === '0')    setSlider(0);
+      else if (k === 'Home') setSlider(1);
+      else if (k === 'End')  setSlider(-1);
+      else if (k === ' ')    { S.chute = !S.chute; S.started = true; e.preventDefault(); }
+      else if (k === 'r' || k === 'R') { if (Math.abs(LTT.speed()) < 0.2) S.dir = -S.dir; }
+      else if (k === 'p' || k === 'P') togglePause();
+      else if (k === 'd' || k === 'D') finish();
+    });
+    window.addEventListener('resize', () => { resize(); setSlider(S.slider); });
+  }
+
+  function togglePause() {
+    if (S.mode === 'run') S.mode = 'paused';
+    else if (S.mode === 'paused') S.mode = 'run';
+    renderOverlay();
+  }
+
+  // ----------------------------------------------------------------- loop
+  let last = 0;
+  function frame(now) {
+    // Clamped at both ends. The upper clamp is the accumulator limit of
+    // SPEC §4.1, so a stalled tab cannot trigger a catch-up spiral. The lower
+    // clamp matters because rAF timestamps and performance.now() do not always
+    // agree, and a single negative frame would run the elapsed clock backwards.
+    const dtWall = Math.max(0, Math.min((now - last) / 1000, P.max_catchup_frames / 60));
+    last = now;
+
+    if (st) {
+      if (S.mode === 'run') {
+        // Effective controls: player input, with the trip stop able to override.
+        // The trip stop is a normal brake application through the normal path,
+        // so the energy it removes lands in W_brake and the ledger still closes.
+        // No crash state, per SPEC decision 11.
+        let thr = Math.max(0, S.slider), brk = Math.max(0, -S.slider);
+        const v = LTT.speed(), d = rules.stopDistance(P, v) + 6;
+        S.tripped = false;
+        if ((v > 0 && st.x + d > P.x_max) || (v < 0 && st.x - d < P.x_min)) {
+          thr = 0; brk = 1; S.tripped = true;
+        }
+        ctl.throttle = thr; ctl.brake = brk; ctl.dir = S.dir; ctl.chute = S.chute;
+
+        if (S.started) S.tWall += dtWall;
+        LTT.step(dtWall * P.C_time);
+      }
+      if (cv) { updateSparks(S.mode === 'run' ? dtWall : 0, 1); draw(dtWall); updateHUD(); }
+    }
+    schedule();
+  }
+
+  // rAF is the right driver when the page is visible, but it does not fire at
+  // all in some environments (headless Chrome with --screenshot, for one, which
+  // is how this game is checked during the build) and is throttled hard in
+  // background tabs. Fall back to a timer if no frame has arrived, so the game
+  // still advances rather than silently freezing.
+  // Whichever of the two fires first wins and the other is discarded, matched
+  // by a generation counter. Without that, both fire, both call frame(), each
+  // schedules another pair, and the frame rate doubles every tick.
+  let tick = 0;
+  function schedule() {
+    const mine = ++tick;
+    const go = t => { if (mine !== tick) return; frame(t); };
+    requestAnimationFrame(go);
+    setTimeout(() => go(performance.now()), 40);
+  }
+
+  // --------------------------------------------------------------- finish
+  function finish() {
+    if (S.practice) { S.mode = 'title'; renderOverlay(); return; }
+    S.verdict = rules.verdict(st, LTT.ledger());
+    S.mode = 'report';
+    if (S.verdict.pass) {
+      const best = store.get('best', null);
+      if (best === null || S.tWall < best) { store.set('best', S.tWall); S.newBest = true; }
+      else S.newBest = false;
+    }
+    renderOverlay();
+  }
+
+  // -------------------------------------------------------------- overlays
+  let overlay = null;
+  function clearOverlay() { if (overlay) { overlay.remove(); overlay = null; } }
+  function modal(build) {
+    clearOverlay();
+    overlay = document.createElement('div'); overlay.className = 'modal';
+    const c = document.createElement('div'); c.className = 'card';
+    build(c); overlay.appendChild(c);
+    (document.querySelector('.stage') || app).appendChild(overlay);
+  }
+
+  function renderOverlay() {
+    clearOverlay();
+    if (S.mode === 'title')  return showTitle();
+    if (S.mode === 'intro')  return showIntro();
+    if (S.mode === 'paused') return showPaused();
+    if (S.mode === 'report') return showReport();
+  }
+
+  // ---- intro (SPEC §5.8). PHYSICS WORDING IS A DRAFT FOR SHAYNE ----------
+  const INTRO = [
+    { h: 'Load the train',
+      draft: false,
+      html:
+        '<p>Twenty grain hopper cars and a locomotive, one kilometre short of a ' +
+        'loading chute. Fill every car, quickly, without throwing grain on the ground.</p>' +
+        '<h3>To pass</h3><ul>' +
+        '<li>Every one of the 20 cars at <b>95 % or more</b>.</li>' +
+        '<li>Total grain loss under <b>1 %</b> of what the chute released.</li>' +
+        '<li>Ranked by elapsed time. Both thresholds are pass-or-fail.</li></ul>' },
+    { h: 'The physics — idealisations', draft: true,
+      html:
+        '<p><b>Zero rolling resistance and zero aerodynamic drag.</b> This is a ' +
+        'deliberate idealisation, and it has a consequence you will feel ' +
+        'immediately: <b>the train never slows down on its own.</b> Every stop ' +
+        'has to be braked.</p>' +
+        '<p>Time runs at <b>25×</b>. One second on the clock is twenty-five ' +
+        'seconds for the train. Every other quantity — the 150 t locomotive, its ' +
+        '3 MW, the 100 t cars, the 2500 t/h chute — is a real figure, unmodified.</p>' },
+    { h: 'The physics — loading costs you speed', draft: true,
+      html:
+        '<p>Grain leaves the chute with <b>no forward speed</b>. When it lands in ' +
+        'a moving car it has to be dragged up to the speed of the train, and the ' +
+        'train pays for that. The faster you are going, the harder it pulls back:</p>' +
+        '<p style="text-align:center"><code>retarding force = v × (dM/dt)</code></p>' +
+        '<p>Watch the <b>drag</b> bar while you load on the move. This is not a ' +
+        'penalty someone typed in — it falls out of the equation of motion, and ' +
+        'you can audit it live with the <b>∑</b> button.</p>' +
+        '<p>Momentum is conserved <b>only while coasting</b>, with no power and no ' +
+        'brake. Under either one the rails push on the train and it is not.</p>' },
+    { h: 'Controls', draft: false,
+      html:
+        '<p>The chute is fixed. You move the train under it.</p>' +
+        '<ul><li><b>Slider</b> — power at the top, brake at the bottom. It stays ' +
+        'where you leave it.</li>' +
+        '<li><b>CHUTE</b> — opens and shuts the grain.</li>' +
+        '<li><b>FORWARD / REVERSE</b> — only below 0.2 m/s. You may shunt back ' +
+        'and top up a car; the clock keeps running.</li>' +
+        '<li><b>DONE</b> — ends the run and scores it.</li></ul>' +
+        '<p class="keys">Keyboard: ↑ ↓ slider · 0 neutral · Home/End full · ' +
+        'SPACE chute · R reverse · P pause · D done</p>' +
+        '<p>Grain lands where the chute is. If a coupling gap — or the ' +
+        'locomotive, or nothing at all — is underneath, that grain is on the ground.</p>' },
+  ];
+
+  function showIntro() {
+    modal(c => {
+      const pg = INTRO[S.introPage];
+      c.innerHTML = '<h2>' + pg.h + '</h2>' +
+        (pg.draft
+          ? '<div class="draft"><div class="draftlab">draft — Shayne to replace ' +
+            'this wording</div>' + pg.html + '</div>'
+          : pg.html);
+      const dots = document.createElement('div'); dots.className = 'dots';
+      INTRO.forEach((_, i) => { const d = document.createElement('div');
+        d.className = 'dot' + (i === S.introPage ? ' on' : ''); dots.appendChild(d); });
+      c.appendChild(dots);
+      const b = document.createElement('div'); b.className = 'cardbtns';
+      const next = document.createElement('button'); next.className = 'primary';
+      next.textContent = S.introPage < INTRO.length - 1 ? 'Next' : 'Start';
+      next.onclick = () => {
+        if (S.introPage < INTRO.length - 1) { S.introPage++; showIntro(); }
+        else { store.set('seen', true); S.introPage = 0; S.mode = 'title'; renderOverlay(); }
+      };
+      const skip = document.createElement('button');
+      skip.textContent = 'Skip';
+      skip.onclick = () => { store.set('seen', true); S.introPage = 0;
+                             S.mode = 'title'; renderOverlay(); };
+      b.appendChild(next); b.appendChild(skip); c.appendChild(b);
+    });
+  }
+
+  function showTitle() {
+    modal(c => {
+      const best = store.get('best', null);
+      c.innerHTML = '<h2>Load the train</h2>' +
+        '<p>Basic Skills for Experimentalists (TIGP 2026), Project 1.</p>' +
+        (best !== null
+          ? '<p>Your best passing run: <b>' + mmss(best) + '</b> &nbsp; grade <b>' +
+            rules.grade(best) + '</b></p>'
+          : '<p>No passing run recorded yet.</p>');
+      const b = document.createElement('div'); b.className = 'cardbtns';
+      const mk = (t, f, cls) => { const x = document.createElement('button');
+        x.textContent = t; x.className = cls || ''; x.onclick = f; b.appendChild(x); };
+      mk('Timed run', () => { newRun(false); clearOverlay(); }, 'primary');
+      mk('Practice', () => { newRun(true); clearOverlay(); });
+      mk('How it works', () => { S.introPage = 0; S.mode = 'intro'; renderOverlay(); });
+      mk('Self tests', () => showPanel('all'));
+      if (best !== null) mk('Reset best', () => { store.del('best'); showTitle(); });
+      c.appendChild(b);
+    });
+  }
+
+  function showPaused() {
+    modal(c => {
+      c.innerHTML = '<h2>Paused</h2><p>The clock is stopped and the controls ' +
+        'are inert.</p>';
+      const b = document.createElement('div'); b.className = 'cardbtns';
+      const mk = (t, f, cls) => { const x = document.createElement('button');
+        x.textContent = t; x.className = cls || ''; x.onclick = f; b.appendChild(x); };
+      mk('Resume', () => { S.mode = 'run'; clearOverlay(); }, 'primary');
+      mk('How it works', () => { S.introPage = 0; S.mode = 'intro'; renderOverlay(); });
+      mk('Abandon run', () => { S.mode = 'title'; renderOverlay(); });
+      c.appendChild(b);
+    });
+  }
+
+  function showReport() {
+    modal(c => {
+      const V = S.verdict, L = LTT.ledger();
+      const t = x => (x / 1000).toFixed(3) + ' t';
+      const MJ = j => (j / 1e6).toFixed(3) + ' MJ';
+      c.innerHTML =
+        '<h2>Run complete</h2>' +
+        '<p class="big ' + (V.pass ? 'pass' : 'fail') + '">' +
+          (V.pass ? 'PASS' : 'FAIL') + '</p>' +
+        '<table class="rpt">' +
+        '<tr><td>every car ≥ 95 %</td><td class="' + (V.fillPass ? 'pass' : 'fail') + '">' +
+          (V.fillPass ? 'PASS' : 'FAIL') + ' — lowest is car ' + V.minCar + ' at ' +
+          (100 * V.minFrac).toFixed(1) + ' %</td></tr>' +
+        '<tr><td>loss &lt; 1 % of released</td><td class="' + (V.lossPass ? 'pass' : 'fail') + '">' +
+          (V.lossPass ? 'PASS' : 'FAIL') + ' — ' + (100 * V.loss).toFixed(3) + ' %</td></tr>' +
+        '<tr><td>elapsed</td><td>' + mmss(S.tWall) + '  (sim ' + mmssS(st.t) + ')</td></tr>' +
+        (V.pass ? '<tr><td>grade</td><td>' + rules.grade(S.tWall) + '</td></tr>' : '') +
+        '</table>' +
+        (V.under.length
+          ? '<p class="fail">Cars under 95 %: ' + V.under.join(', ') + '</p>' : '') +
+        (V.pass && S.newBest ? '<p class="pass">New personal best.</p>' : '') +
+        '<h3>Mass ledger — Test 1</h3><table class="rpt">' +
+        '<tr><td>released by the chute</td><td>' + t(L.m_released) + '</td></tr>' +
+        '<tr><td>in cars</td><td>' + t(L.m_cars) + '</td></tr>' +
+        '<tr><td>on the ground</td><td>' + t(L.m_ground) + '</td></tr>' +
+        '<tr><td>closure</td><td>' + L.mass_closure.toExponential(2) + '</td></tr></table>' +
+        '<h3>Energy ledger — Test 2</h3><table class="rpt">' +
+        '<tr><td>W_traction</td><td>' + MJ(L.W_traction) + '</td></tr>' +
+        '<tr><td>W_brake</td><td>' + MJ(L.W_brake) + '</td></tr>' +
+        '<tr><td>ΔKE_total</td><td>' + MJ(L.dKE) + '</td></tr>' +
+        '<tr><td>E_diss = ½∫v²dM</td><td>' + MJ(L.E_diss) + '</td></tr>' +
+        '<tr><td>closure</td><td>' + L.energy_closure.toExponential(2) + '</td></tr></table>';
+      const b = document.createElement('div'); b.className = 'cardbtns';
+      const mk = (tx, f, cls) => { const x = document.createElement('button');
+        x.textContent = tx; x.className = cls || ''; x.onclick = f; b.appendChild(x); };
+      mk('Run again', () => { newRun(false); clearOverlay(); }, 'primary');
+      mk('Title', () => { S.mode = 'title'; renderOverlay(); });
+      c.appendChild(b);
+    });
+  }
+
   // --- entry ---------------------------------------------------------------
-  // ?test goes straight to the panel. Otherwise a placeholder until Phase C.
   const wantTest = /(^|[?&])test(=|&|$)/.test(location.search);
   if (wantTest) {
     showPanel('all');
   } else {
-    const d = document.createElement('div');
-    d.className = 'panel';
-    d.innerHTML = '<header><h1>Load the train</h1>' +
-      '<p>Phase A of <code>PLAN.md</code> is complete: the physics core and all ' +
-      'four acceptance tests. Rendering, controls and the game itself are ' +
-      'Phases C to E and are not built yet.</p></header>';
-    const b = document.createElement('button');
-    b.className = 'primary'; b.textContent = 'DEBUG — self tests';
-    b.onclick = () => showPanel('all');
-    d.appendChild(b);
-    app.innerHTML = ''; app.appendChild(d);
+    newRun(false);
+    buildGame();
+    S.mode = store.get('seen', false) ? 'title' : 'intro';
+    renderOverlay();
+    last = performance.now();
+    schedule();
   }
 })();
 </script>
