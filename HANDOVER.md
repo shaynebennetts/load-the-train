@@ -199,8 +199,11 @@ broke the moment the flow rate rose 40×. Zero-expectation rows now **require** 
    `μ → ∞` and so never exercises the adhesion cap. Shayne may strike it.
 6. **`PLAN.md` task 5 is superseded** (friction brake removed) and is annotated as such.
    Tasks 22, 17 and 25 are outstanding.
-7. **Never written to the repository root.** The root is reserved for the project website and
-   is not ours. `git ls-files` must never show a root `index.html`.
+7. ~~**Never written to the repository root.**~~ — **closed 2026-09-12.** The root was
+   reserved *for the project website*, and that website now exists: `index.html`,
+   `favicon.svg` and `images/` at the root, which is exactly the layout the course requires
+   (one project = one repository + one GitHub-Pages project website + one wall card). The
+   app stays in `app/`. Page assets go in `images/`; nothing else belongs at the root.
 
 ---
 
