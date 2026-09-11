@@ -1,255 +1,111 @@
 # Load the train — handover
 
-**Read this first, then `SPEC.md`. `PLAN.md` is the original build plan and is now partly
-historical — see §6.**
-
 Project 1, Basic Skills for Experimentalists (TIGP 2026). Brief: `loadthetrainspec.md`
-(Shayne's, authoritative). Repo: `github.com/shaynebennetts/load-the-train`,
-**nothing has ever been pushed** — all work is local commits on `main`.
+(Shayne's, authoritative).
 
-State as of commit `c936348`, plus the 1 MW power raise (§3, uncommitted at time of writing).
+**Read this file, then only the topic doc you need.** They are separate so you do not have to
+load all of it:
 
----
-
-## 1. Where things stand
-
-**The game is built and playable.** Open `app/index.html` directly from disk; no server, no
-build step, no dependencies, no network requests. 115 kB, one file.
-
-- All four of the brief's acceptance tests pass, plus a supplementary adhesion check (S3)
-  and a determinism check. Run them at `app/index.html?test`, or click DEBUG on the title
-  screen, or `LTT.runTest(n, opts)` in the console.
-- Physics core, rules, rendering, input, HUD, fill strip, yard map, intro, end-of-run
-  report, practice mode and personal-best storage are all in.
-- **Not done:** grade-band calibration (PLAN task 22), 60 fps profiling on a real phone
-  (task 17), cross-browser/Pages deployment check (task 25).
+| doc | when to read it |
+|---|---|
+| [`docs/PHYSICS.md`](docs/PHYSICS.md) | before touching the integrator, the parameters or the ledger |
+| [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md) | before quoting any number, anywhere |
+| [`docs/TESTING.md`](docs/TESTING.md) | running the tests, the harness, headless capture |
+| [`docs/PUBLISHING.md`](docs/PUBLISHING.md) | the live URLs, Pages, the website, the wall card |
+| `SPEC.md` | the full specification and decision record |
+| `PLAN.md` | the original build plan; partly historical, task 5 superseded |
 
 ---
 
-## 2. What changed after the game first worked
+## 1. Where things stand — 2026-09-12
 
-The parameters in `SPEC.md` §3 were substantially retuned on Shayne's play feedback, in this
-order. Each is committed separately with its measurements in the commit message.
+**Built, playable, published.** One HTML file: no server, no build step, no dependencies, no
+network requests. Live at https://shaynebennetts.github.io/load-the-train/ — see
+`docs/PUBLISHING.md`.
+
+- All four of the brief's acceptance tests pass, plus a supplementary adhesion check (S3) and
+  a determinism check. `app/index.html?test`.
+- Physics core, rules, rendering, input, HUD, fill strip, yard map, intro, end-of-run report,
+  practice mode and personal-best storage are all in.
+- Project website, icon and screenshots at the repository root; card on the class wall.
+- **Outstanding:** grade bands (open point 1, needs a decision), 60 fps profiling on a real
+  phone (PLAN task 17), cross-browser check (task 25).
+
+> **A correction to the record.** The commit `HANDOVER: published state, measured run lengths,
+> grade-band data` claims changes that never reached the file — its edit script aborted on a
+> not-found string before writing, and only one open point was actually updated. If you are
+> reading that commit message, trust this file instead. The content it described is now here
+> and in `docs/`.
+
+---
+
+## 2. Parameter history
+
+Each change is a separate commit with its measurements in the message. **The commit log is the
+real record of why every parameter is what it is.**
 
 | change | from | to | why |
 |---|---|---|---|
-| traction law | `min(throttle·P/v, μmg)` | `throttle · min(P/v, μmg)` | **bug** — see below |
-| rated power | 3.0 MW | **1 MW** | twitchy, then 30 kW, then 500 kW; raised to 1 MW on Shayne's instruction |
-| chute flow | 2500 t/h | 100 000 t/h (40×) | accretion term was unobservable |
+| traction law | `min(throttle·P/v, μmg)` | `throttle · min(P/v, μmg)` | **bug** — `PHYSICS.md` §3 |
+| rated power | 3.0 MW | **1 MW** | 3 MW → 30 kW → 500 kW → 1 MW, last step on Shayne's instruction |
+| chute flow | 2500 t/h | 100 000 t/h (40×) | accretion term was otherwise unobservable |
 | time compression `C` | 25 | **1 — none** | timing windows scaled as 1/C and became unplayable |
 | approach | 1000 m | 30 m | 1 km was a minute of holding full power |
 | friction brake | `k_b·M·g` | **removed** | retardation is regenerative |
 | controls | throttle + brake + reverser | **one signed throttle** | follows from the above |
 | pass threshold | 95 % per car | **90 %** | Shayne's call; **departs from the brief**, disclosed in the intro |
-
-**The traction bug is worth understanding**, because it was the cause of "control fidelity is
-way too coarse". With the throttle scaling only the power term, the `min()` always selected
-the adhesion cap below `throttle · v_c`, so **1 % throttle and 100 % throttle both produced
-the full 441.30 kN** and the throttle had no authority at all from rest. Now the notch
-commands a fraction of available tractive effort, which is what a real locomotive controller
-does.
+| `stopDistance()` | constant-power only | **piecewise** | it under-estimated; `PHYSICS.md` §5 |
 
 ---
 
-## 3. The physics, in one page
+## 3. Open points
 
-Read `SPEC.md` §2 properly, but the load-bearing facts:
-
-- **The integrator state is momentum**, `p = Mv`, not velocity. With grain arriving at
-  `u = 0` the variable-mass law is just `dp/dt = F_ext`, so the `v·dM/dt` retarding term
-  **is never written down anywhere** — it emerges when `v` is recovered as `p/M`. Do not
-  "add" it. If you ever find yourself typing `v*dMdt` into the integrator, something has
-  gone wrong.
-- **The mass update happens after the mechanical update, deliberately.** That operator split
-  is the perfectly-inelastic-collision picture: the mass rises with `p` untouched, so `v`
-  drops and exactly `½v²dm` of kinetic energy disappears. That is where the brief's factor
-  of two lives.
-- **`ledger` must not be written from `physics`'s algebra.** It is handed raw per-substep
-  samples and derives everything from `SPEC.md` §2.7 route 2 on its own. This separation is
-  the brief's explicit safeguard against the factor-of-two error and is a review criterion,
-  not a style preference.
-- **There is no loss coefficient.** Loss is the aperture-trough overlap integral and nothing
-  else. Integrated over one pitch it is exactly `L_body/L_pitch` = 91.176471 %.
-- **There is no brake.** `braking()` does not exist. Retardation is `traction()` with a
-  negative argument.
-
-### Current parameters
-
-```
-g 9.80665     m_loco 150 t    m_driven 150 t   P_rated 1 MW     mu 0.30
-N_cars 20     m_tare 28 t     m_cap 100 t      L_body 15.5 m    L_pitch 17.0 m
-mdot 27 777.8 kg/s (100 000 t/h)               w_chute 0.8 m    L_loco 21 m
-x_start -30   x_min -60       x_max 700        C_time 1         h_step 1/240 s
-fill_target 0.90              loss_budget 0.01                  test_tol 0.001
-```
-
-Derived: `M_tare` 710 t, `M_full` 2710 t, `F_adhesion` 441.30 kN, `v_cross` 2.266 m/s,
-`train_len` 361 m, `t_fill_car` 3.60 s, `t_fill_all` 72.0 s, `gap_duty` 8.82 %.
-
-### The two numbers that shape the game
-
-```
-loading terminal speed   v_eq = sqrt(P_rated / mdot) = 6.000 m/s
-one-pass fill limit      L_body / (m_cap/mdot)       = 4.306 m/s
-```
-
-**At 1 MW the first number is above the second, deliberately.** Until 2026-09-11 it was the
-other way round at 500 kW (4.243 vs 4.306) and the grain held the train just *below* the
-speed at which a car can still be filled in one pass, so holding full throttle from the start
-line to the end of the train was very nearly a winning strategy on its own — measured 94.9 %
-aboard. Shayne asked for 1 MW; the knee is now crossed and full throttle settles at 6.24 m/s
-and gets 69.7 % aboard, so the player must modulate the throttle to stay under 4.31 m/s over
-each car. Full measurements in `SPEC.md` §9 decision 6.
-
-The settled speed is a little above `v_eq` because grain is captured only over the car bodies
-— 91.18 % duty — so the effective flow is `0.9118·mdot`, giving 6.28 m/s.
-
-**If you retune `P_rated` or `mdot` again, recompute both numbers and say which side of the
-knee you are on.** It changes what the game is about.
-
-### The speed the gate actually sets
-
-The 4.306 m/s above is the speed at which a car fills to the *brim* in one pass. What the
-player is scored against is `fill_target`, so the speed that matters is
-
-```
-v_max = L_body / (fill_target * m_cap / mdot)    = 4.784 m/s at 90 %   (4.532 at 95 %)
-```
-
-Measured against the shipped code by holding a constant speed past the whole train with the
-chute open: 4.30 -> 100.0 %, 4.50 -> 95.7 %, **4.78 -> 90.1 %**, 5.00 -> 86.1 % (median car).
-So lowering the gate to 90 % bought 5.6 % more speed on a single pass. It did **not** make
-full throttle viable — that settles at 6.24 m/s and loads 69.7 %.
-
----
-
-## 4. Tests — how to run them, and the rules
-
-```
-app/index.html?test          panel, all tests
-LTT.runTest(3, {mu: Infinity, P_rated: 4e5, M: 5e5, t: 30})     any override
-LTT.ledger()  LTT.params()  LTT.state()  LTT.setState({...})  LTT.step(dt)
-```
-
-Headless, against the shipped file (used throughout the build). The scratch scripts are not
-in the repo; here is the whole harness, which runs the **actual shipped code**, not a copy:
-
-```js
-// harness.js
-const fs = require('fs');
-const APP = 'C:/Claude/TIGP-2026-2/load-the-train/app/index.html';
-function loadCore() {
-  const m = fs.readFileSync(APP, 'utf8')
-              .match(/<script id="ltt-core">([\s\S]*?)<\/script>/);
-  if (!m) throw new Error('no #ltt-core block');
-  (new Function(m[1]))();          // the core publishes globalThis.LTT
-  return globalThis.LTT;
-}
-module.exports = { loadCore };
-// runall.js:  const {loadCore}=require('./harness.js');
-//             for (const t of loadCore().runAll())
-//               console.log((t.pass ? 'PASS' : 'FAIL') + '  ' + t.id + '  ' + t.title);
-//             runAll() returns an ARRAY of test objects {id,title,rows,pass}; there
-//             is no .text field. Each row is {label,got,pred,unit,relerr,pass}.
-```
-
-Screenshots were taken by copying `app/index.html` to a temp file, injecting
-`localStorage.setItem('ltt.seen','true')` before `#ltt-core`, pinning `#app` to the target
-size (headless lays out ~80 px wider than it screenshots, which silently clips the
-right-hand controls), then driving the real UI with `--headless=new --screenshot`.
-
-**Rules, from the brief, which must not be relaxed:**
-- Do not weaken a test to make it pass.
-- Do not hard-code an expected value from an observed output.
-- Do not catch an exception to make a failure disappear.
-- If a test fails, report the failure and stop.
-
-**One trap already found and fixed, do not reintroduce it.** `row()` used to fall back to the
-raw absolute difference when the expected value was zero, so `ΔKE + E_diss = 0` compared
-**joules against a dimensionless 0.1 % tolerance**. It passed only by luck of magnitude, and
-broke the moment the flow rate rose 40×. Zero-expectation rows now **require** a `scale` and
-`row()` throws without one. Keep that.
-
----
-
-## 5. Known open points
-
-1. **Grade bands are invented** (`rules.BANDS`: A < 150 s, B < 180 s, C < 225 s). They have
-   never been calibrated against a real run and are almost certainly wrong now that `C = 1`
-   **and more so now that power is 1 MW** — the fastest possible pass is quicker but a
-   single pass no longer fills the train, so run times have not merely shifted, the shape of
-   an optimal run has changed. PLAN task 22. **Do this first if Shayne wants to play
-   seriously.**
-2. **Run length is unmeasured.** With `C = 1` the whole train takes 361 s to pass the chute
-   at 1 m/s, or 69.4 s at full throttle at 1 MW — but a full-throttle pass leaves the train
-   only 69.7 % loaded, so a real run needs more than one pass or a slower one. Nobody has
-   played a complete 20-car run end to end. A full run may be too long.
-3. ~~**Intro physics wording is a DRAFT**~~ — **closed 2026-09-11.** Shayne accepted it as
-   written. The red bar, the `.draft` / `.draftlab` CSS and the per-card `draft` flag are all
-   removed. One stale number was corrected on acceptance: the stopping distance read "about
-   30 m from 1 m/s", a 30 kW-era figure; measured at 1 MW it is 3.1 m from 1 m/s and 77 m
-   from 4.3 m/s loaded, and the text now quotes the loading-speed figure. `SPEC.md` §5.8
-   records this.
-4. **Departures from the brief's own text** are in `SPEC.md` §3.2: 1 MW vs its 2–4.5 MW
-   band, 30 m vs its 1 km, 100 000 t/h vs its 1500–3000 t/h. All disclosed to the player in
-   the intro. The brief's §3.8 explicitly permits raising the flow rate as one of three ways
-   to fix the timescale, so that one is in-bounds; the other two are not and are stated as
-   such.
-5. **Supplementary check S3** is beyond the brief's four tests. Kept because Test 3 runs at
+1. **Grade bands are too loose, and this is now a decision, not a measurement.**
+   `rules.BANDS` is `A < 150 s, B < 180 s, C < 225 s`, invented and never calibrated. The
+   physics floor is **~91 s**; Shayne's first complete run was **131 s** and scored an **A**
+   while he described it as "OK". Proposed **A < 105, B < 125, C < 150** — put to him
+   2026-09-12, **not yet answered, not applied**. Whatever is chosen, change `rules.BANDS`
+   and `SPEC.md` §5.6 together. Numbers in `docs/MEASUREMENTS.md` §1.
+2. **Both wall blurbs are Claude's drafts.** The course rule is that the blurb is the
+   student's own two sentences. Offered 2026-09-12, not yet replaced. Same for the project
+   website prose.
+3. **Departures from the brief's own text**, all disclosed to the player in the intro and
+   recorded in `SPEC.md` §3.2: 1 MW vs its 2–4.5 MW band, 30 m vs its 1 km, 100 000 t/h vs
+   its 1500–3000 t/h, and 90 % vs its 95 % pass threshold. The brief's §3.8 explicitly permits
+   raising the flow rate; the others are out-of-band and are stated as such.
+4. **Supplementary check S3** is beyond the brief's four tests. Kept because Test 3 runs at
    `μ → ∞` and so never exercises the adhesion cap. Shayne may strike it.
-6. **`PLAN.md` task 5 is superseded** (friction brake removed) and is annotated as such.
-   Tasks 22, 17 and 25 are outstanding.
-7. ~~**Never written to the repository root.**~~ — **closed 2026-09-12.** The root was
-   reserved *for the project website*, and that website now exists: `index.html`,
-   `favicon.svg` and `images/` at the root, which is exactly the layout the course requires
-   (one project = one repository + one GitHub-Pages project website + one wall card). The
-   app stays in `app/`. Page assets go in `images/`; nothing else belongs at the root.
+5. **`PLAN.md` task 5 is superseded** (friction brake removed) and annotated as such. Tasks
+   22, 17 and 25 outstanding.
+
+**Closed:** the intro physics wording (accepted as written 2026-09-11; the draft bar and
+`.draft` CSS are gone) · run length (measured, 90–135 s) · the repository-root prohibition
+(the root now holds the project website it was reserved for — `docs/PUBLISHING.md` §2).
 
 ---
 
-## 6. Deliberate non-obvious choices
+## 4. Next steps, in order
 
-Things that look like bugs but are not:
-
-- **`schedule()` uses rAF *and* a 40 ms timer, mutually exclusive by generation counter.**
-  rAF does not fire at all in headless Chrome, which is how the game is screenshot-tested.
-  Without the generation counter both fire, both call `frame()`, each schedules another pair,
-  and the frame rate doubles every tick until the browser dies. This happened.
-- **`dtWall` is clamped at both ends.** The lower clamp matters: rAF timestamps and
-  `performance.now()` do not always agree and one negative frame ran the clock backwards.
-- **The camera snaps when more than 150 m from target** rather than lerping.
-- **The caption positions itself from the HUD's measured height**, because the HUD wraps to
-  two lines at phone width.
-- **Cosmetic grain particles use their own seeded PRNG stream** that the physics never reads,
-  so particle activity cannot perturb a trajectory.
-- **`geometry.range()` solves for the candidate cars rather than searching**, so per-step cost
-  does not grow with car count.
-- **Test 4 derives its own chute-open time** from `m_cap/mdot` rather than hard-coding it,
-  which is why it survived the 40× flow change untouched.
-
----
-
-## 7. Suggested next steps, in order
-
-1. Play a complete run. Nobody has. Measure how long it takes and whether it is enjoyable.
-2. Calibrate the grade bands from ~10 real runs (PLAN task 22) and update both `rules.BANDS`
-   and `SPEC.md` §5.6 together.
-3. Profile on a real phone (task 17). Physics is now only 4 steps/frame, so this should be
+1. **Get a decision on the grade bands** and apply it. Everything else is polish.
+2. Ask Shayne for his own blurb and website wording.
+3. Profile on a real phone (PLAN task 17). Physics is 4 steps/frame, so it should be
    comfortable, but it is unverified on hardware.
-4. Cross-browser and GitHub Pages check (task 25), including confirming zero network requests
-   in devtools.
-5. ~~Ask Shayne to replace the draft physics wording.~~ Done — accepted as written.
-6. Only then consider pushing. **Do not push without asking** — nothing has been published yet.
+4. Cross-browser check (task 25), including confirming zero network requests in devtools.
 
 ---
 
-## 8. Working agreement with Shayne
+## 5. Working agreement with Shayne
 
-- He wrote the brief and is the physicist; when he says the physics is wrong, **check it
+- He wrote the brief and is the physicist. When he says the physics is wrong, **check it
   properly and show the numbers** rather than either capitulating or getting defensive. One
-  such challenge turned out to be correct behaviour that was simply invisible in play; the
+  such challenge turned out to be correct behaviour that was merely invisible in play; the
   useful response was measured evidence plus a design fix, not a code change.
 - He makes playability calls that override the brief's own parameter bands. Do them, then
   disclose them in `SPEC.md` §3.2 and in the player-facing intro.
-- Commit per change with the measurements in the message. The commit log is the real record
-  of why every parameter is what it is.
+- He prefers the simple mechanism over the clever one. A `rank` field added to the class wall
+  to control ordering was rejected in favour of just setting the dates — see
+  `docs/PUBLISHING.md` §4.
+- Commit per change with the measurements in the message.
+- **Measure before asserting.** Several documented numbers in this project turned out to be
+  stale by 10× because they were carried forward from an earlier parameter set instead of
+  being re-measured. `docs/MEASUREMENTS.md` exists so that stops happening.
