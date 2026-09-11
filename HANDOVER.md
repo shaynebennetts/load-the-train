@@ -28,8 +28,8 @@ network requests. Live at https://shaynebennetts.github.io/load-the-train/ — s
 - Physics core, rules, rendering, input, HUD, fill strip, yard map, intro, end-of-run report,
   practice mode and personal-best storage are all in.
 - Project website, icon and screenshots at the repository root; card on the class wall.
-- **Outstanding:** grade bands (open point 1, needs a decision), 60 fps profiling on a real
-  phone (PLAN task 17), cross-browser check (task 25).
+- **Outstanding:** 60 fps profiling on a real phone (PLAN task 17), cross-browser check
+  (task 25).
 
 > **A correction to the record.** The commit `HANDOVER: published state, measured run lengths,
 > grade-band data` claims changes that never reached the file — its edit script aborted on a
@@ -55,42 +55,38 @@ real record of why every parameter is what it is.**
 | controls | throttle + brake + reverser | **one signed throttle** | follows from the above |
 | pass threshold | 95 % per car | **90 %** | Shayne's call; **departs from the brief**, disclosed in the intro |
 | `stopDistance()` | constant-power only | **piecewise** | it under-estimated; `PHYSICS.md` §5 |
+| grade bands | A < 150, B < 180, C < 225 | **A < 105, B < 125, C < 150** | invented; calibrated against the measured ~91 s floor |
 
 ---
 
 ## 3. Open points
 
-1. **Grade bands are too loose, and this is now a decision, not a measurement.**
-   `rules.BANDS` is `A < 150 s, B < 180 s, C < 225 s`, invented and never calibrated. The
-   physics floor is **~91 s**; Shayne's first complete run was **131 s** and scored an **A**
-   while he described it as "OK". Proposed **A < 105, B < 125, C < 150** — put to him
-   2026-09-12, **not yet answered, not applied**. Whatever is chosen, change `rules.BANDS`
-   and `SPEC.md` §5.6 together. Numbers in `docs/MEASUREMENTS.md` §1.
-2. **Both wall blurbs are Claude's drafts.** The course rule is that the blurb is the
+1. **Both wall blurbs are Claude's drafts.** The course rule is that the blurb is the
    student's own two sentences. Offered 2026-09-12, not yet replaced. Same for the project
    website prose.
-3. **Departures from the brief's own text**, all disclosed to the player in the intro and
+2. **Departures from the brief's own text**, all disclosed to the player in the intro and
    recorded in `SPEC.md` §3.2: 1 MW vs its 2–4.5 MW band, 30 m vs its 1 km, 100 000 t/h vs
    its 1500–3000 t/h, and 90 % vs its 95 % pass threshold. The brief's §3.8 explicitly permits
    raising the flow rate; the others are out-of-band and are stated as such.
-4. **Supplementary check S3** is beyond the brief's four tests. Kept because Test 3 runs at
+3. **Supplementary check S3** is beyond the brief's four tests. Kept because Test 3 runs at
    `μ → ∞` and so never exercises the adhesion cap. Shayne may strike it.
-5. **`PLAN.md` task 5 is superseded** (friction brake removed) and annotated as such. Tasks
-   22, 17 and 25 outstanding.
+4. **`PLAN.md` task 5 is superseded** (friction brake removed) and annotated as such.
+   Task 22 is now done; tasks 17 and 25 remain.
 
-**Closed:** the intro physics wording (accepted as written 2026-09-11; the draft bar and
-`.draft` CSS are gone) · run length (measured, 90–135 s) · the repository-root prohibition
-(the root now holds the project website it was reserved for — `docs/PUBLISHING.md` §2).
+**Closed:** grade bands (calibrated and approved 2026-09-12 — A < 105 s, B < 125 s,
+C < 150 s, against a measured ~91 s floor; PLAN task 22 done) · the intro physics wording
+(accepted as written 2026-09-11; the draft bar and `.draft` CSS are gone) · run length
+(measured, 90–135 s) · the repository-root prohibition (the root now holds the project
+website it was reserved for — `docs/PUBLISHING.md` §2).
 
 ---
 
 ## 4. Next steps, in order
 
-1. **Get a decision on the grade bands** and apply it. Everything else is polish.
-2. Ask Shayne for his own blurb and website wording.
-3. Profile on a real phone (PLAN task 17). Physics is 4 steps/frame, so it should be
+1. Ask Shayne for his own blurb and website wording. Everything else is polish.
+2. Profile on a real phone (PLAN task 17). Physics is 4 steps/frame, so it should be
    comfortable, but it is unverified on hardware.
-4. Cross-browser check (task 25), including confirming zero network requests in devtools.
+3. Cross-browser check (task 25), including confirming zero network requests in devtools.
 
 ---
 

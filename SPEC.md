@@ -584,7 +584,7 @@ from the title screen. Reads and writes are wrapped, and the game functions norm
 ### 5.6 Scoring
 
 ```
-Gate 1:  min over cars of (fill / capacity)  ≥  95.0 %
+Gate 1:  min over cars of (fill / capacity)  ≥  90.0 %   (fill_target, §9 item 7)
 Gate 2:  m_ground / m_released              <   1.00 %
 ```
 
@@ -592,8 +592,24 @@ Both pass → **PASS**, ranked by elapsed time alone. Either fails → **FAIL**,
 specific cars and the actual loss figure reported. No composite score, no partial credit:
 the brief's two thresholds stay thresholds.
 
-Provisional grade bands, **to be calibrated by playtesting** (PLAN task 22): A < 2:30,
-B < 3:00, C < 3:45, D otherwise.
+**Grade bands, calibrated 2026-09-12** (PLAN task 22, now done):
+
+| grade | elapsed |
+|---|---|
+| A | < 1:45 (105 s) |
+| B | < 2:05 (125 s) |
+| C | < 2:30 (150 s) |
+| D | otherwise |
+
+Set against a **measured floor**, not invented. An ideal driver — exact speed hold, perfect
+chute timing — completes a passing run in **90.8 s**, holding 4.50 m/s, every car at 90.7 %
+with 0.000 % loss. At 4.60 m/s the run takes 89.0 s but every car falls under the gate, so
+~91 s is a hard physics floor: below it no chute timing can fill the cars, because a car is
+not under the chute long enough. A is therefore within about 15 % of the floor.
+
+The previous bands (A < 2:30, B < 3:00, C < 3:45) were invented before anyone had played a
+complete run, and were far too loose — they awarded an A to a 131 s run the player described
+as "OK". Full sweep in `docs/MEASUREMENTS.md` §1.
 
 ### 5.7 Art
 
@@ -854,7 +870,8 @@ Explicitly not built, so review can confirm the boundary:
 
 Flagged rather than decided, for Shayne's call:
 
-1. **Grade bands** (§5.6) are provisional and need playtesting to calibrate. PLAN task 22.
+1. ~~**Grade bands** are provisional~~ — **closed 2026-09-12.** Calibrated against the
+   measured ~91 s floor and approved by Shayne: A < 105 s, B < 125 s, C < 150 s (§5.6).
 2. **Supplementary check S3** (§7.3) is beyond the brief's four tests. Kept because Test 3
    at `μ → ∞` leaves the adhesion cap unverified, but easy to strike.
 3. **Test 3's `v_0 = 10⁻⁶ m/s`** is a departure from "from rest", forced by `P/0`. The exact

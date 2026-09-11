@@ -870,8 +870,21 @@ const rules = (() => {
     };
   }
 
-  // Provisional bands, to be calibrated by playtesting (PLAN task 22).
-  const BANDS = [[150, 'A'], [180, 'B'], [225, 'C']];
+  // Calibrated 2026-09-12 (PLAN task 22), against a measured floor rather than
+  // invented. An ideal driver -- exact speed hold, perfect chute timing -- needs
+  // 90.8 s: at a held 4.50 m/s every car lands at 90.7 % with 0.000 % loss. At
+  // 4.60 m/s the run is 89.0 s but every car falls under the 90 % gate, so ~91 s
+  // is a hard physics floor, not a skill ceiling.
+  //
+  //   A < 105 s   within ~15 % of the floor
+  //   B < 125 s
+  //   C < 150 s
+  //   D otherwise
+  //
+  // The previous bands (A < 150) were invented and far too loose: they awarded
+  // the top grade to a 131 s run that the player himself described as "OK".
+  // Numbers and method in docs/MEASUREMENTS.md.
+  const BANDS = [[105, 'A'], [125, 'B'], [150, 'C']];
   function grade(tWall) {
     for (const [lim, g] of BANDS) if (tWall < lim) return g;
     return 'D';

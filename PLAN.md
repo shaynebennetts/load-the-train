@@ -295,14 +295,23 @@ Four skippable, re-openable cards (§5.8) and the report of §5.4.
 
 ## Phase E — polish and calibration
 
-### Task 22 — grade band calibration
+### Task 22 — grade band calibration — **CLOSED 2026-09-12, by a different method**
 Play ten complete runs. Set the A/B/C bands from the distribution, replacing the provisional
 values in §5.6 (A < 2:30, B < 3:00, C < 3:45).
 
-- **Done:** bands set from measured times, and both `SPEC.md` §5.6 and the code updated
-  together.
-- **Demonstrated by:** the ten run times tabulated in the commit message, with the chosen
-  bands and the reasoning. A must be achievable but not routine.
+- **Done:** bands set to **A < 105 s, B < 125 s, C < 150 s**; `rules.BANDS` and `SPEC.md`
+  §5.6 updated together; approved by Shayne.
+- **But not as this task specified, and that should be said plainly.** There is **one** real
+  run on record (131 s), not ten. The bands are anchored instead to a *measured physics
+  floor*: an ideal driver — exact speed hold, perfect chute timing — needs 90.8 s, and at
+  4.60 m/s the run is quicker but every car falls under the 90 % gate, so ~91 s is a hard
+  limit no skill can beat. A is set at ~15 % above it.
+- **Why that is arguably the better anchor:** a distribution of ten runs by one player
+  measures that player on that day; the floor is a property of the parameters and does not
+  move. It is also reproducible — `docs/MEASUREMENTS.md` §1 gives the sweep and the method.
+- **What is still missing:** nobody has confirmed that A is *achievable by a human*. The one
+  real datapoint (131 s) is a C. If a few more runs never get under 105 s, A is too hard and
+  the bands should move — the floor tells you where the wall is, not where a person lands.
 
 ### Task 23 — practice mode
 No clock, no gate, free reset, jump-to-any-car, ledger expanded by default (§5.5).

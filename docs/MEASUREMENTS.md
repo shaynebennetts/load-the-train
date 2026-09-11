@@ -27,12 +27,26 @@ trough that still has room). It is the physics ceiling, not a human one.
 **~91 s is a hard floor.** Below it no chute timing can fill the cars, because the car simply
 is not under the chute for long enough.
 
-**Shayne's first complete run: 2:11 (131 s)** — 1.44× optimal, and a good result. It scored an
-**A**, because `rules.BANDS` starts at `A < 150 s`. He described the run as "OK". That
-mismatch is the evidence that the bands are too loose; see `../HANDOVER.md` open point 1.
+**Shayne's first complete run: 2:11 (131 s)** — 1.44× optimal, and a good result. Under the
+old bands it scored an **A**, because they started at `A < 150 s`, while he described the run
+as merely "OK". That mismatch was the evidence that the bands were too loose, and is what
+prompted the calibration below.
 
 Run length is therefore **90–135 s**. The old worry that a full run might be tediously long
 was unfounded.
+
+### The bands these produced — applied 2026-09-12
+
+| grade | elapsed | |
+|---|---|---|
+| A | < 105 s | within ~15 % of the 91 s floor |
+| B | < 125 s | |
+| C | < 150 s | **a 131 s run lands here** |
+| D | ≥ 150 s | |
+
+Approved by Shayne and applied to `rules.BANDS` and `SPEC.md` §5.6 together. Note the
+boundary: 131 s is a **C**, not a B — an earlier note in this project claimed otherwise and
+was wrong.
 
 ---
 
