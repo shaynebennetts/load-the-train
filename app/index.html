@@ -159,6 +159,8 @@ const physics = (() => {
       x: par.x_start,                         // m, position of the loco nose
       p: 0,                                   // kg m/s, = M*v
       fill: new Float64Array(par.N_cars),     // kg of grain in each car
+      m_grain: 0,                             // cached sum of `fill`
+      L: null,                                // ledger accumulator, if attached
       // instrumentation, not physics
       n_base: 0, n_sub: 0, max_sub_per_base: 0,
     };
@@ -171,9 +173,12 @@ const physics = (() => {
     for (let i = 0; i < st.fill.length; i++) s += st.fill[i];
     return s;
   }
+  // `m_grain` is kept in step with `fill` by every deposition, so mass() is O(1)
+  // and is not re-summing twenty cars several times per substep.
   function mass(st) {
-    return st.par.m_loco + st.par.N_cars * st.par.m_tare + grainAboard(st);
+    return st.par.m_loco + st.par.N_cars * st.par.m_tare + st.m_grain;
   }
+  function resync(st) { st.m_grain = grainAboard(st); }
   function speed(st) { return st.p / mass(st); }
 
   // --- forces --------------------------------------------------------------
@@ -242,11 +247,40 @@ const physics = (() => {
   }
 
   // Apply a completed substep.
+  // Order matters here and is physical, not incidental. The mechanical update
+  // moves momentum by the external impulse alone. THEN the grain arrives: the
+  // mass rises with p unchanged, so v = p/M drops, and the kinetic energy falls
+  // by exactly 0.5*v^2*dm. That is the inelastic-collision picture of SPEC §2.7
+  // route 2 appearing as an operator split rather than as a formula — the
+  // retarding term is still never written down anywhere.
+  //
+  // Geometry is evaluated at the substep midpoint, an O(dt^2) choice. The train
+  // moves at most 0.083 m per substep at 20 m/s, and under 0.005 m per substep
+  // at the speeds loading actually happens at, against a 0.8 m aperture.
   function commit(st, ctl, r) {
+    const x_mid = st.x + 0.5 * r.dx;
+
     st.x += r.dx;
     st.p += r.dp;
+
+    let dm_rel = 0, dep = { captured: 0, ground: 0 };
+    if (ctl.chute) {
+      dm_rel = st.par.mdot * r.dt;
+      dep = geometry.deposit(st.par, st.fill, x_mid, dm_rel);
+      st.m_grain += dep.captured;
+    }
+
     st.t += r.dt;
     st.n_sub++;
+
+    // The ledger is handed raw samples and does its own physics and its own
+    // quadrature. It is not told the answer. SPEC §6.
+    if (st.L) {
+      ledger.accumulate(st.L, {
+        dt: r.dt, M: r.M, stages: r.k,
+        dm_released: dm_rel, dm_captured: dep.captured, dm_ground: dep.ground,
+      });
+    }
   }
 
   // --- adaptive substepping (SPEC §4.1) ------------------------------------
@@ -303,7 +337,7 @@ const physics = (() => {
     st.t = t0 + dt;
   }
 
-  return { create, mass, speed, grainAboard, advance, baseStep, rk4 };
+  return { create, mass, speed, grainAboard, resync, advance, baseStep, rk4 };
 })();
 
 // ===========================================================================
@@ -367,18 +401,17 @@ const geometry = (() => {
   // Deposit `dm` kg of released grain. Returns what was captured and what hit
   // the ground. Grain is lost to: coupling gaps, the locomotive roof, the space
   // ahead of car 0, the space beyond the last car, and overflow of a full car.
-  function deposit(st, dm) {
+  function deposit(par, fill, x, dm) {
     if (!(dm > 0)) return { captured: 0, ground: 0 };
-    const par = st.par;
-    const [lo, hi] = range(par, st.x);
+    const [lo, hi] = range(par, x);
     let captured = 0;
     for (let k = lo; k <= hi; k++) {
-      const o = overlap(par, st.x, k);
+      const o = overlap(par, x, k);
       if (o <= 0) continue;
       const want = dm * o / par.w_chute;
-      const room = par.m_cap - st.fill[k];
+      const room = par.m_cap - fill[k];
       const take = want < room ? want : (room > 0 ? room : 0);
-      st.fill[k] += take;
+      fill[k] += take;
       captured += take;
     }
     return { captured, ground: dm - captured };
@@ -404,6 +437,75 @@ const geometry = (() => {
 })();
 
 // ===========================================================================
+//  ledger — SPEC.md §2.8. The accounting, kept deliberately separate from the
+//  integrator.
+//
+//  The brief's explicit safeguard against the factor-of-two error is that the
+//  reasoning which writes the integrator must not also write the ledger. So
+//  this module is handed raw per-substep samples — dt, M, the RK4 stage
+//  velocities and forces, and the grain released / captured / spilled — and
+//  derives every quantity from SPEC §2.7 route 2, the inelastic-collision
+//  argument, on its own. It never reads the integrator's algebra, and the
+//  identity of Test 2 is CHECKED here, never assumed.
+// ===========================================================================
+const ledger = (() => {
+
+  function create(st) {
+    return {
+      // mass, kg
+      m_released: 0,        // flow rate x open time
+      m_captured: 0,        // accumulated here, independently of where the
+                            //   cars store it — so the two can disagree
+      m_ground: 0,
+      m_cars_0: st ? st.m_grain : 0,   // grain already aboard when we started
+      worst_step_mass_residual: 0,
+      // energy — task 8
+      n: 0,
+    };
+  }
+
+  function accumulate(L, s) {
+    L.n++;
+
+    // --- mass -------------------------------------------------------------
+    // Per substep the released grain either lands in a trough or hits the
+    // ground; there is no third place for it to be, because landing is
+    // instantaneous (SPEC decision 5). So the identity holds at EVERY step,
+    // not merely over a run, and the worst per-step residual is recorded.
+    const r = s.dm_released - (s.dm_captured + s.dm_ground);
+    const ar = r < 0 ? -r : r;
+    if (ar > L.worst_step_mass_residual) L.worst_step_mass_residual = ar;
+
+    L.m_released += s.dm_released;
+    L.m_captured += s.dm_captured;
+    L.m_ground   += s.dm_ground;
+  }
+
+  // Test 1 (SPEC §7.1):  m_released == m_cars + m_ground
+  function report(L, st) {
+    const m_cars = st.m_grain - L.m_cars_0;
+    const rhs = m_cars + L.m_ground;
+    const resid = L.m_released - rhs;
+    const rel = L.m_released > 0 ? Math.abs(resid) / L.m_released : 0;
+    // Second route: the ledger's own captured total against the cars' own state.
+    const split = Math.abs(L.m_captured - m_cars);
+    return {
+      m_released: L.m_released,
+      m_cars, m_ground: L.m_ground,
+      m_captured_by_ledger: L.m_captured,
+      mass_residual: resid,
+      mass_closure: rel,
+      mass_per_car_split_residual: split,
+      worst_step_mass_residual: L.worst_step_mass_residual,
+      loss_fraction: L.m_released > 0 ? L.m_ground / L.m_released : 0,
+      substeps: L.n,
+    };
+  }
+
+  return { create, accumulate, report };
+})();
+
+// ===========================================================================
 //  LTT — the console API of SPEC.md §7.5. Grows task by task.
 // ===========================================================================
 const CTL_NEUTRAL = { throttle: 0, brake: 0, dir: 1, chute: false };
@@ -416,7 +518,29 @@ const LTT = {
   derived: () => DERIVED,
   geom:    geometry,
 
-  reset(over) { _st = physics.create(over); _ctl = Object.assign({}, CTL_NEUTRAL); return LTT; },
+  reset(over) {
+    _st = physics.create(over);
+    _ctl = Object.assign({}, CTL_NEUTRAL);
+    _st.L = ledger.create(_st);
+    return LTT;
+  },
+
+  // Re-arm the ledger at the CURRENT state, so a test can position the train
+  // and pre-load cars first and still measure only what it meant to measure.
+  arm() { physics.resync(_st); _st.L = ledger.create(_st); return LTT; },
+
+  ledger() { return ledger.report(_st.L, _st); },
+
+  // Run a list of segments, each {t, ...controls}. Controls persist between
+  // segments; x / v / fill may be set at a segment boundary. This is how the
+  // scripted sequences of SPEC §7.1 and §7.2 are driven.
+  runScript(segs) {
+    for (const g of segs) {
+      LTT.setState(g);
+      physics.advance(_st, _ctl, g.t || 0);
+    }
+    return LTT.ledger();
+  },
 
   // Set controls and/or kinematic state directly. Tests use this instead of
   // the input layer, so they are exactly reproducible (SPEC §4.2).
@@ -426,7 +550,10 @@ const LTT = {
       if (k in s) _ctl[k] = s[k];
     }
     if ('x' in s) _st.x = s.x;
-    if ('fill' in s) { for (let i = 0; i < _st.fill.length; i++) _st.fill[i] = s.fill[i] || 0; }
+    if ('fill' in s) {
+      for (let i = 0; i < _st.fill.length; i++) _st.fill[i] = s.fill[i] || 0;
+      physics.resync(_st);
+    }
     if ('v' in s) _st.p = s.v * physics.mass(_st);   // after fill, so M is right
     if ('p' in s) _st.p = s.p;
     return LTT;
@@ -439,6 +566,7 @@ const LTT = {
       t: _st.t, x: _st.x, p: _st.p,
       v: physics.speed(_st), M: physics.mass(_st),
       grain_aboard: physics.grainAboard(_st),
+      m_grain: _st.m_grain,
       fill: Array.from(_st.fill),
       n_base: _st.n_base, n_sub: _st.n_sub, max_sub_per_base: _st.max_sub_per_base,
     };
@@ -458,6 +586,8 @@ const LTT = {
       const extra = o.M - bare;
       if (extra < 0) throw new Error('M below bare train mass ' + bare);
       _st.fill[0] = extra;
+      physics.resync(_st);
+      _st.L = ledger.create(_st);
       if ('v' in o) _st.p = o.v * physics.mass(_st);
     }
     if ('v0' in o) _st.p = o.v0 * physics.mass(_st);
