@@ -197,8 +197,22 @@ const physics = (() => {
     return ctl.dir * Math.min(ctl.throttle * par.P_rated / vd, adh);
   }
 
-  // Filled in by task 5.
-  function braking(par, ctl, v, M) { return 0; }
+  // Brake, SPEC §2.5. A FORCE, never a constant power — a constant-power brake
+  // misbehaves at low speed for exactly the reason traction does.
+  //
+  //   F_brake = demand * min( k_b * M * g , mu * M * g )
+  //
+  // All axles of loco and cars are braked, so the braked weight is the full
+  // instantaneous train weight including loaded grain. The deceleration k_b*g
+  // is therefore mass independent. With k_b = 0.12 and mu = 0.30 the design
+  // brake ratio binds and the adhesion branch is unreachable; the min() is
+  // implemented anyway because it is the structurally correct statement, and a
+  // wet-rail variant would make it bind (SPEC open point 4).
+  function braking(par, ctl, v, M) {
+    if (!(ctl.brake > 0) || v === 0) return 0;
+    const Fmax = ctl.brake * Math.min(par.k_brake, par.mu) * M * par.g;
+    return v > 0 ? -Fmax : Fmax;          // always opposes motion
+  }
 
   // --- one substep ---------------------------------------------------------
   // Classical RK4 on (x, p). M is held at its substep-entry value: within a
@@ -246,13 +260,25 @@ const physics = (() => {
       const M = mass(st);
       const v = st.p / M;
       const par = st.par;
-      const F = Math.abs(traction(par, ctl, v) + braking(par, ctl, v, M));
+      const Ft = traction(par, ctl, v), Fb = braking(par, ctl, v, M);
+      const F = Math.abs(Ft + Fb);
       const cap = par.sub_tol * Math.max(Math.abs(v), par.sub_vref) * M;
       // dt such that |dp| stays under `cap`; unbounded when there is no force.
       let dt = F > 0 ? cap / F : Infinity;
       if (!(dt > 1e-13)) dt = 1e-13;          // guarantee forward progress
       if (dt > left) dt = left;
+      // Brakes bring a train to rest; they do not drive it backwards. The brake
+      // force is independent of v, so the stopping motion is exactly constant
+      // deceleration and the stop time is exact: land the substep on it rather
+      // than overshooting and clamping, which would leave the brake work
+      // integral disagreeing with the momentum actually removed.
+      if (Fb !== 0 && Ft === 0) {
+        const t_stop = -v * M / (Ft + Fb);
+        if (t_stop > 0 && t_stop < dt) dt = t_stop;
+      }
       commit(st, ctl, rk4(st, ctl, dt));
+      // Snap off float dust so a braked train sits still instead of jittering.
+      if (Fb !== 0 && Math.abs(st.p) < 1e-6 * M) st.p = 0;
       left -= dt;
       subs++;
     }
