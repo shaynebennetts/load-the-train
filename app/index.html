@@ -1,0 +1,149 @@
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Load the train</title>
+
+<style>
+  :root {
+    --outline: #3B2A1F;
+    --grain:   #E8B54A;
+    --barn:    #C4483A;
+    --sky-hi:  #7FC4CE;
+    --sky-lo:  #BFE3E8;
+    --silo:    #A89684;
+    --soil:    #8A6F52;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--outline);
+    color: #F6EFE3;
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+  }
+  #app { position: fixed; inset: 0; }
+</style>
+
+<div id="app"></div>
+
+<!--
+  Load the train — Project 1, Basic Skills for Experimentalists (TIGP 2026).
+  Single self-contained file. No build step, no dependencies, no network loads.
+  See SPEC.md and PLAN.md alongside this file.
+
+  Two scripts, deliberately:
+    #ltt-core  pure physics. No DOM, no rendering, no input. Runnable in node.
+    #ltt-app   rendering, input and UI. Touches the DOM.
+  The split is what lets Phase A of PLAN.md be verified headlessly.
+-->
+
+<script id="ltt-core">
+// ===========================================================================
+//  PARAMS — every constant from SPEC.md §3, with its justification.
+//  Single source of truth. Frozen: nothing downstream may mutate it.
+//  SI throughout: kg, m, s, N, J, W. Tonnes and km appear only in the UI.
+// ===========================================================================
+const PARAMS = Object.freeze({
+
+  // --- physical constants -------------------------------------------------
+  g: 9.80665,              // m/s^2, standard gravity, exact by definition
+
+  // --- locomotive ---------------------------------------------------------
+  m_loco:   150000,        // kg. Mid of the brief's 120-200 t. Six-axle Co-Co
+                           //     road freight unit.
+  m_driven: 150000,        // kg. All six axles driven, so the full loco mass
+                           //     sits on driven axles. Cars are unpowered.
+  P_rated:  3.0e6,         // W. Mid of the brief's 2-4.5 MW. ~4000 hp.
+  mu:       0.30,          // Wheel-rail adhesion. Mid of the brief's 0.25-0.35
+                           //     for dry rail with sanding. -> F_adh 441.30 kN.
+  k_brake:  0.12,          // Design brake ratio. Decel k_b*g = 1.177 m/s^2, the
+                           //     normal band for a fully braked freight consist.
+                           //     Under mu, so wheels do not slide.
+  L_loco:   21.0,          // m, over couplers. Typical Co-Co.
+
+  // --- cars ---------------------------------------------------------------
+  N_cars:   20,            // Given by the brief.
+  m_tare:   28000,         // kg. Mid of the brief's 25-30 t.
+  m_cap:    100000,        // kg. Top of the brief's 60-100 t, so that
+                           //     20 x 100 t = 2000 t matches the brief's own
+                           //     timescale arithmetic.
+  L_body:   15.5,          // m. Open trough length of a large covered hopper.
+  L_pitch:  17.0,          // m, over couplers. Gives a 1.5 m gap, 8.82 % duty.
+
+  // --- chute --------------------------------------------------------------
+  mdot:     2500000 / 3600, // kg/s = 694.444. Mid of the brief's 1500-3000 t/h.
+                            //     A real grain terminal rate, unmodified.
+  w_chute:  0.8,           // m aperture. Single-spout terminal chute. Narrower
+                           //     than the 1.5 m gap, so a gap cannot be
+                           //     straddled harmlessly.
+  h_chute:  4.0,           // m above the car rim. Visual only — landing is
+                           //     instantaneous (SPEC decision 5).
+  x_chute:  0.0,           // m. Defines the origin of track coordinates.
+
+  // --- grain --------------------------------------------------------------
+  rho_grain: 770,          // kg/m^3, wheat. Sets the drawn fill height:
+                           //     100 t -> 129.9 m^3 against a
+                           //     15.5 x 3.0 x 2.8 m interior = 130.2 m^3.
+  car_w:     3.0,          // m interior width   } together with L_body these
+  car_d:     2.8,          // m interior depth   } give the 130.2 m^3 above
+
+  // --- track --------------------------------------------------------------
+  x_start:  -1000.0,       // m. Loco nose 1 km short of the chute. Given.
+  x_min:    -1100.0,       // m } generous, so free shunting never hits a wall.
+  x_max:     700.0,        // m } No buffer stops, no crash state (decision 11).
+
+  // --- time ---------------------------------------------------------------
+  C_time:   25.0,          // Time compression. 1 s wall = 25 s simulated.
+                           //     2000 t at 2500 t/h is 48 min simulated, which
+                           //     is not a game; at C=25 the loading is 115 s of
+                           //     wall clock. Nothing else is compressed.
+                           //     See SPEC.md §3.1.
+  h_step:   1 / 240,       // s of SIMULATED time. Accuracy then does not depend
+                           //     on C or on display refresh rate. 100 steps per
+                           //     rendered frame at 60 fps and C=25.
+  max_catchup_frames: 3,   // Accumulator clamp: a stalled tab cannot spiral.
+
+  // --- adaptive substepping (SPEC §4.1) -----------------------------------
+  sub_tol:    0.01,        // Bisect while |dv| > sub_tol * max(|v|, sub_vref).
+  sub_vref:   0.05,        // m/s. Floor, so the criterion is finite at v -> 0.
+  sub_depth:  20,          // Bisection depth cap. 2^20 substeps worst case.
+
+  // --- rules (SPEC §5.6) --------------------------------------------------
+  fill_target: 0.95,       // Every car must reach >= 95 % of capacity.
+  loss_budget: 0.01,       // Total loss must stay < 1 % of grain RELEASED
+                           //     (decision 14 — the same two quantities that
+                           //     Test 1's mass ledger closes on).
+
+  // --- test tolerance (SPEC §7) -------------------------------------------
+  test_tol:   0.001,       // 0.1 %, as the brief requires.
+});
+
+// --- derived constants, computed once so nothing re-derives them by hand ---
+const DERIVED = Object.freeze({
+  M_tare:  PARAMS.m_loco + PARAMS.N_cars * PARAMS.m_tare,        // 710 000 kg
+  M_full:  PARAMS.m_loco + PARAMS.N_cars * (PARAMS.m_tare + PARAMS.m_cap),
+  m_grain_total: PARAMS.N_cars * PARAMS.m_cap,                   // 2 000 000 kg
+  F_adhesion: PARAMS.mu * PARAMS.m_driven * PARAMS.g,            // 441 299.2 N
+  // Speed at which P/v falls to the adhesion limit. Below this, adhesion
+  // governs; above it, constant power does. SPEC §2.4.
+  v_cross: PARAMS.P_rated / (PARAMS.mu * PARAMS.m_driven * PARAMS.g),
+  gap: PARAMS.L_pitch - PARAMS.L_body,                           // 1.5 m
+  gap_duty: (PARAMS.L_pitch - PARAMS.L_body) / PARAMS.L_pitch,   // 8.82 %
+  train_len: PARAMS.L_loco + PARAMS.N_cars * PARAMS.L_pitch,     // 361 m
+  decel: PARAMS.k_brake * PARAMS.g,                              // 1.1768 m/s^2
+  t_fill_car: PARAMS.m_cap / PARAMS.mdot,                        // 144 s sim
+  t_fill_all: PARAMS.N_cars * PARAMS.m_cap / PARAMS.mdot,        // 2880 s sim
+});
+
+// ===========================================================================
+//  LTT — the console API of SPEC.md §7.5. Grows task by task.
+// ===========================================================================
+const LTT = {
+  params:  () => PARAMS,
+  derived: () => DERIVED,
+};
+
+if (typeof globalThis !== 'undefined') { globalThis.LTT = LTT; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
+</script>
+
+<script id="ltt-app">
+// Rendering, input and UI. Phase C onward of PLAN.md. Deliberately empty for now.
+</script>
