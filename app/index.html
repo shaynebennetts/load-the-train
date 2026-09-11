@@ -257,20 +257,19 @@ const PARAMS = Object.freeze({
                            //     road freight unit.
   m_driven: 150000,        // kg. All six axles driven, so the full loco mass
                            //     sits on driven axles. Cars are unpowered.
-  P_rated:  0.03e6,        // W = 30 kW. DELIBERATELY 100x BELOW the brief's
-                           //     2-4.5 MW band, and disclosed as such
-                           //     (SPEC 3.2). Starting 30 m from the chute there
-                           //     is no line haul to do: the whole game is
-                           //     low-speed shunting, and 3 MW under 25x time
-                           //     compression ran the train away faster than
-                           //     anyone could place a car. Cut 10x, then 10x
-                           //     again on play feedback. This drops the
-                           //     adhesion/power crossover from 6.80 m/s to
-                           //     0.068 m/s, so the train is power-limited over
-                           //     the entire working range and adhesion governs
-                           //     only the first tenth of a second off the mark.
-                           //     Tractive effort at 1 m/s is now 30 kN, not the
-                           //     441 kN adhesion cap.
+  P_rated:  0.5e6,         // W = 500 kW. Below the brief's 2-4.5 MW band but
+                           //     a realistic rating for a 150 t yard shunter,
+                           //     and disclosed (SPEC 3.2). Starting 30 m from
+                           //     the chute there is no line haul to do; the
+                           //     whole game is low-speed shunting.
+                           //     Settled by tuning against the ACCRETION DRAG
+                           //     rather than by feel alone. Full throttle with
+                           //     the chute open has a terminal speed
+                           //       v_eq = sqrt(P/mdot) = 4.24 m/s
+                           //     and a car can still be filled in one pass up
+                           //     to 4.31 m/s — so this is very nearly the
+                           //     largest power at which the grain, not the
+                           //     locomotive, is still the binding constraint.
   mu:       0.30,          // Wheel-rail adhesion. Mid of the brief's 0.25-0.35
                            //     for dry rail with sanding. -> F_adh 441.30 kN.
   L_loco:   21.0,          // m, over couplers. Typical Co-Co.
@@ -2308,10 +2307,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = LTT; }
         'train — there is no speeding up or slowing down of the simulation.</p>' +
         '<p>The 150 t locomotive and the 100 t cars are real figures. Two things ' +
         'are not: the chute runs at <b>100 000 t/h</b>, about forty times a real ' +
-        'grain terminal, and the locomotive is rated at only <b>30 kW</b>. Both ' +
-        'are deliberate. A realistic chute takes 144 s to fill one car, which ' +
-        'would mean creeping at 0.1 m/s and feeling nothing; at this rate the ' +
-        'grain fights you hard enough to matter.</p>' },
+        'grain terminal, and the locomotive is a <b>500 kW</b> yard shunter ' +
+        'rather than a main-line unit. Both are deliberate. A realistic chute ' +
+        'takes 144 s to fill one car, which would mean creeping at 0.1 m/s and ' +
+        'feeling nothing; at this rate the grain fights you hard enough to ' +
+        'matter. At full power with the chute open the grain holds the train to ' +
+        'about <b>4.2 m/s</b> — the locomotive cannot outrun it.</p>' },
     { h: 'The physics — loading costs you speed', draft: true,
       html:
         '<p>Grain leaves the chute with <b>no forward speed</b>. When it lands in ' +

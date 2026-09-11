@@ -130,28 +130,19 @@ one second of wall clock (25 s simulated):
 
 | notch | `F_traction` | `a` | reached | travelled |
 |---|---|---|---|---|
-| 5 % | 0.318 m/s | 5.1 m | 0.455 m/s | 14.8 m |
-| 10 % | 0.455 m/s | 7.4 m | 0.646 m/s | 21.3 m |
-| 25 % | 0.724 m/s | 12.0 m | 1.026 m/s | 34.0 m |
-| 50 % | 1.026 m/s | 17.0 m | 1.452 m/s | 48.3 m |
-| 100 % | 1.452 m/s | 24.1 m | 2.054 m/s | 68.4 m |
-
-(columns: speed and distance after one and after two seconds of wall clock)
-
-A 50 % notch held for one second moves the train 17.0 m, exactly one car pitch, so placing
-the next car under the chute is a judgeable act rather than a lottery. Tractive effort at
-1 m/s is 30 kN against a 441.30 kN adhesion cap, so the train is power-limited over the
-entire working range.
+The notch scales the whole `min()`, so 2 % of full effort is 2 % of full effort from rest,
+at any speed. At 500 kW, `v_c = 1.133 m/s`: adhesion governs the launch, constant power
+governs the rest. Full throttle from rest covers 0.31 m in the first second and the 30 m
+approach in 12.5 s.
 
 The adhesion cap is still mandatory: `P/v` diverges as `v → 0`, which without it produces
 either an instantaneous launch or a NaN at `t = 0`. With the parameters of §3 it binds below
 
 ```
-v_c = P_rated / (μ · m_driven · g) = 30 kW / 441.30 kN = 0.06798 m/s
+v_c = P_rated / (μ · m_driven · g) = 500 kW / 441.30 kN = 1.133 m/s
 ```
 
-so the train is **power-limited across essentially the whole working speed range**, and
-adhesion governs only the first moment off the mark.
+so adhesion governs the launch and constant power governs everything above a walking pace.
 
 ### 2.5 Retardation — regenerative, not friction
 
@@ -322,7 +313,7 @@ Every value, and why. `g = 9.80665 m/s²` exactly.
 |---|---|---|
 | Locomotive mass `m_loco` | **150 t** | Mid of the brief's 120–200 t. A six-axle Co-Co road freight unit. |
 | Driven mass `m_driven` | **150 t** | All six axles driven, so the full loco mass sits on driven axles. Cars are unpowered. |
-| Rated power `P_rated` | **0.03 MW** = 30 kW | **Deliberately 100× below the brief's 2–4.5 MW band. See §3.2.** A yard shunter, not a line-haul unit. Cut 10×, then 10× again on play feedback. |
+| Rated power `P_rated` | **0.5 MW** = 500 kW | Below the brief's 2–4.5 MW band, but a realistic rating for a 150 t yard shunter. See §3.2. Set against the accretion drag rather than by feel. |
 | Adhesion coefficient `μ` | **0.30** | Mid of the brief's 0.25–0.35 for dry rail with sanding. Gives `F_adhesion = 441.30 kN`. |
 | Car tare `m_tare` | **28 t** | Mid of the brief's 25–30 t. |
 | Car capacity `m_cap` | **100 t** | Top of the brief's 60–100 t, chosen so the 20 × 100 t = 2000 t figure matches the brief's own timescale arithmetic. |
@@ -345,7 +336,7 @@ Derived, for reference:
 | Train tare mass | 710 t |
 | Train fully loaded | 2710 t |
 | Adhesion force | 441.30 kN |
-| Adhesion/constant-power crossover `v_c` | 0.6798 m/s |
+| Adhesion/constant-power crossover `v_c` | 1.133 m/s |
 | Launch acceleration, tare | 0.6216 m/s² |
 | Launch acceleration, loaded | 0.1628 m/s² |
 | Tractive effort at 1 m/s (full) | 30.0 kN |
@@ -354,7 +345,9 @@ Derived, for reference:
 | Time to fill all twenty | 72.0 s |
 | Max speed to fill a car in one pass | 4.306 m/s |
 | Accretion drag at 1 m/s | 27.8 kN |
-| Loading terminal speed `sqrt(P/ṁ)` | 1.039 m/s |
+| Loading terminal speed `sqrt(P/ṁ)` | 4.243 m/s |
+| Accretion drag at that speed | 117.9 kN (adhesion cap 441.3 kN) |
+| Full throttle, 30 m approach | 12.5 s, reaching 4.04 m/s |
 
 ### 3.1 The timescale choice — stated explicitly
 
@@ -403,7 +396,7 @@ player-facing intro.
 there is no line haul to do: the entire game is low-speed shunting, placing a 15.5 m trough
 under a 0.8 m chute, twenty times. Under 25× time compression a 3 MW unit crossed a car
 pitch faster than anyone could react. Cut 10×, played, cut 10× again. The effect is to move
-the adhesion/power crossover from 6.80 m/s down to 0.068 m/s, so the train is power-limited
+the adhesion/power crossover from 6.80 m/s down to 1.13 m/s, so the train is power-limited
 over its entire working range and adhesion governs only the first tenth of a second off the
 mark. Nothing else about the locomotive changed: it is still 150 t on 150 t of driven axles
 at μ = 0.30.
@@ -717,13 +710,13 @@ exact solution with that initial condition is `v = sqrt(v_0² + 2Pt/M)`, and `v_
 sits fifteen orders of magnitude below `v²` at `t = 1 s`, so it is indistinguishable from the
 brief's formula at the 0.1 % tolerance. **This is stated, not hidden** — see open point 3.
 
-Predictions at `M = 710 t`, `P = 3.0 MW`, `sqrt(2P/M) = 2.907009`:
+Predictions at `M = 710 t`, `P = 500 kW`, `sqrt(2P/M) = 1.186782`:
 
-| `t` (s sim) | `v` (m/s) | `s` (m) |
+| `t` (s) | `v` (m/s) | `s` (m) |
 |---|---|---|
-| 10 | 9.19277 | 61.2851 |
-| 30 | 15.92235 | 318.4469 |
-| 60 | 22.51760 | 900.7040 |
+| 10 | 3.75293 | 25.0196 |
+| 30 | 6.50027 | 130.0054 |
+| 60 | 9.19277 | 367.7108 |
 
 **Supplementary check S3 — the adhesion limit itself.** Beyond the brief's four tests, and
 clearly labelled as an addition Shayne may strike. Because Test 3 runs at `μ → ∞`, nothing
@@ -739,15 +732,16 @@ The offset is **exactly `t_c/2`**, because a constant force from rest delivers p
 the energy that constant power would over the same interval:
 `½Mv_c² = ½·(F_a·v_c)·t_c = ½·P·t_c`. A pleasing result, and easy to check by hand.
 
-At `M = 710 t`: `a = 0.62155 m/s²`, `t_c = 10.9374 s`, `v_c = 6.7981 m/s`, `s_c = 37.177 m`.
+At `M = 710 t`: `a = 0.621548 m/s²`, `t_c = 1.822896 s`, `v_c = 1.133018 m/s`,
+`s_c = 1.0327 m`, offset `t_c/2 = 0.911448 s`.
 
-| `t` (s sim) | exact `v` | exact `s` | naive `v` | naive `s` |
+| `t` (s) | exact `v` | exact `s` | naive `v` | naive `s` |
 |---|---|---|---|---|
-| 10 | 6.21548 | 31.0774 | 9.1928 (+47.9 %) | 61.285 (+97.2 %) |
-| 30 | 14.39815 | 247.8627 | 15.9223 (+10.6 %) | 318.447 (+28.5 %) |
-| 60 | 21.46690 | 792.8045 | 22.5176 (+4.9 %) | 900.704 (+13.6 %) |
+| 10 | 3.57782 | 22.0223 | 3.75293 (+4.9 %) | 25.0196 (+13.6 %) |
+| 30 | 6.40076 | 124.4702 | 6.50027 (+1.6 %) | 130.0054 (+4.4 %) |
+| 60 | 9.12268 | 359.7082 | 9.19277 (+0.8 %) | 367.7108 (+2.2 %) |
 
-The naive deviation decays only as `t_c/2t` — still 0.46 % at `t = 600 s` — which is why
+The naive deviation decays only as `t_c/2t`, still 0.15 % at `t = 600 s`, which is why
 Test 3 needs `μ → ∞` rather than simply being evaluated late. The panel prints this
 comparison so the discrepancy is on the record rather than buried.
 
@@ -841,20 +835,7 @@ Flagged rather than decided, for Shayne's call:
    are deliberate playability calls made on play feedback, and both are departures from the
    brief's own text rather than from something it left open.
 5. **Physics wording in the intro is a draft** for you to replace (§5.8), marked in the file.
-6. **Rated power is now very likely too low.** `P = 30 kW` was chosen in two steps to tame
-   the train at `C = 25`; removing the compression has made the train 25× more sluggish
-   again, and full throttle from rest now covers 0.18 m in the first second. Raising it
-   trades directly against how much the accretion drag dominates, through the loading
-   terminal speed `v_eq = sqrt(P/ṁ)`:
-
-   | `P` | `v_eq` | first second from rest | 30 m approach |
-   |---|---|---|---|
-   | 30 kW | 1.04 m/s | 0.18 m | 29 s |
-   | 120 kW | 2.08 m/s | 0.39 m | ~19 s |
-   | 250 kW | 3.00 m/s | 0.56 m | ~14 s |
-   | 500 kW | 4.24 m/s | 0.79 m | ~11 s |
-
-   The maximum speed at which a car can still be filled in one pass is 4.31 m/s, so beyond
-   about 500 kW the train can outrun the chute and the drag stops being the binding
-   constraint. **250–300 kW is the recommended band**: responsive, and still firmly
-   drag-dominated.
+6. **Rated power settled at 500 kW** (was 30 kW). This sits almost exactly at the point
+   where the locomotive stops being the binding constraint: `v_eq = sqrt(P/ṁ) = 4.243 m/s`
+   against a one-pass fill limit of 4.306 m/s. Any more power and the train can outrun the
+   chute and the accretion drag ceases to govern. Worth re-checking after playtesting.
